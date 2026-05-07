@@ -102,6 +102,16 @@ function App() {
     input.click();
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userColor');
+    setView('login');
+    setRooms([]);
+    setActiveRoom(null);
+    setDisplayName('');
+  };
+
   // --- FETCH FUNCTIONS ---
   const fetchRooms = async () => {
     try {
@@ -585,6 +595,7 @@ function App() {
         onDeleteRoom={handleDeleteRoom}
         onRenameRoom={handleRenameRoom} 
         onChangeCover={handleChangeCover} 
+         onLogout={handleLogout}
       />
 
       <CreateModal 
