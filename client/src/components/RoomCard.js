@@ -27,7 +27,7 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
                     <button 
                         onClick={(e) => { e.stopPropagation(); onChangeCover(); }}
                         className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/50 hover:bg-black/70 text-white text-[9px] font-black uppercase tracking-widest rounded-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100">
-                        Change Cover 📸
+                        Change Cover 
                     </button>
                 )}
 
