@@ -72,14 +72,7 @@ const CreateModal = ({
                     </div>
 
                     <div>
-                        <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3">Your Display Name</label>
-                        <input 
-                            type="text" 
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 text-sm font-medium outline-none focus:ring-2 focus:ring-brand-100 transition" 
-                            placeholder="e.g. Alex Rivera" 
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
-                        />
+                        <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3">Your Display Name</label>                  
                     </div>
 
                     <div>

@@ -609,8 +609,6 @@ function App() {
         setStep={setStep}
         roomTitle={roomTitle}        
         setRoomTitle={setRoomTitle}  
-        displayName={displayName} 
-        setDisplayName={setDisplayName}
         avatarColor={avatarColor} 
         setAvatarColor={setAvatarColor}
         roomCode={roomCode} 
@@ -623,8 +621,6 @@ function App() {
         onClose={() => setIsJoinModalOpen(false)}
         roomCode={roomCode} 
         setRoomCode={setRoomCode}
-        displayName={displayName} 
-        setDisplayName={setDisplayName}
         avatarColor={avatarColor} 
         setAvatarColor={setAvatarColor}
         handleJoin={handleJoinRoom}
