@@ -70,10 +70,7 @@ const CreateModal = ({
                             onChange={(e) => setRoomTitle(e.target.value)}
                         />
                     </div>
-{/* 
-                    <div>
-                        <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3">Your Display Name</label>                  
-                    </div> */}
+
 
                     <div>
                         <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3"> Avatar Color</label>

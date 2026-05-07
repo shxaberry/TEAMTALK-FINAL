@@ -54,7 +54,7 @@ const Login = ({ setAuth, switchToSignup }) => {
         </div>
 
         <h1>Welcome back</h1>
-        <p className="subtext">Sign in to access your TeamTalk workspace.</p>
+        <p className="subtext">Log in in to access your TeamTalk workspace.</p>
 
         <form onSubmit={handleLogin} noValidate>
           {error && <div className="alert error">{error}</div>}
@@ -101,7 +101,7 @@ const Login = ({ setAuth, switchToSignup }) => {
           </div>
 
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
 

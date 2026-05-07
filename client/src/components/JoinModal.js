@@ -1,6 +1,6 @@
 import React from 'react';
 
-const JoinModal = ({ isOpen, onClose, roomCode, setRoomCode, displayName, setDisplayName, avatarColor, setAvatarColor, handleJoin }) => {
+const JoinModal = ({ isOpen, onClose, roomCode, setRoomCode, displayName, avatarColor, setAvatarColor, handleJoin }) => {
   if (!isOpen) return null;
 
   const colors = ["#6366f1", "#8b5cf6", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444"];
@@ -34,10 +34,7 @@ const JoinModal = ({ isOpen, onClose, roomCode, setRoomCode, displayName, setDis
                 <p className="text-[10px] text-gray-400 mt-3 font-medium">Format: TT-XXXX (from the room owner)</p>
             </div>
 
-            <div>
-                <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3">Your Display Name</label>
-            </div>
-
+          
             <div>
                 <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3"> Avatar Color</label>
                 <div className="flex items-center gap-3">

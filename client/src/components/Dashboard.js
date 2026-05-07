@@ -89,7 +89,11 @@ const Dashboard = ({
                     <section className="mb-24">
                         <div className="flex items-center justify-between mb-10">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center text-xl"></div>
+                                <div className="w-10 h-10 bg-indigo-50 rounded-full flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                                    </svg>
+                                </div>
                                 <h2 className="text-2xl font-extrabold text-gray-800">My Designs</h2>
                                 <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase shadow-sm">
                                     {myDesigns.length}
@@ -129,7 +133,11 @@ const Dashboard = ({
                     <section>
                         <div className="flex items-center justify-between mb-10">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl">👥</div>
+                                <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m9-4a4 4 0 11-8 0 4 4 0 018 0zm6 4a2 2 0 11-4 0 2 2 0 014 0zM7 16a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                </div>
                                 <h2 className="text-2xl font-extrabold text-gray-800">Joined Rooms</h2>
                                 <span className="bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase shadow-sm">
                                     {joinedRooms.length}
@@ -145,15 +153,22 @@ const Dashboard = ({
                             <div className="absolute right-[-10%] top-[-20%] w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                             
                             <div className="flex items-center gap-8 relative z-10">
-                                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shadow-lg font-bold">
-                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                                <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shadow-lg font-bold">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                                    </svg>
                                 </div>
                                 <div>
                                     <h3 className="font-extrabold text-2xl tracking-tight">Enter a Room Code</h3>
                                     <p className="opacity-80 text-lg mt-1 font-medium tracking-tight">Collaborate on a teammate's design.</p>
                                 </div>
                             </div>
-                            <div className="mr-6 group-hover:translate-x-3 transition-transform relative z-10 text-3xl">➔</div>
+
+                            <div className="mr-6 group-hover:translate-x-3 transition-transform relative z-10">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                </svg>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
