@@ -345,14 +345,14 @@ io.on('connection', (socket) => {
     socket.on("join_room", (roomCode) => socket.join(roomCode));
     socket.on("update_poll", (roomCode) => io.to(roomCode).emit("poll_updated"));
 
-    socket.on("send_message", async (data) => {
+    socket.on("send_message", (data) => {
         if (data.type === 'text') {
             await db.execute(
                 'INSERT INTO messages (roomCode, user_id, user, message, color, type) VALUES (?, ?, ?, ?, ?, ?)', 
                 [data.room, data.user_id || null, data.user, data.message, data.color, 'text']
             );
         }
-        socket.to(data.room).emit("receive_message", data);
+        io.to(data.room).emit("receive_message", data);
     });
 
     socket.on("element_added", (data) => {

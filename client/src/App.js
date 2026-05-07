@@ -14,8 +14,7 @@ axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem(
 const socket = io("http://localhost:5000"); 
 
 function App() {
-  // --- ALL STATES FIRST, NO E ARLY RETURN ---
-  const [view, setView] = useState('login');
+  // --- ALL STATES FIRST, NO EARLY RETURN ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [activeRoom, setActiveRoom] = useState(null); 
@@ -109,6 +108,7 @@ function App() {
     localStorage.removeItem('token');
     localStorage.removeItem('userName');
     localStorage.removeItem('userColor');
+    axios.defaults.headers.common['Authorization'] = '';
     setView('login');
     setRooms([]);
     setActiveRoom(null);
@@ -156,34 +156,67 @@ useEffect(() => {
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setDisplayName(localStorage.getItem('userName') || '');
         setAvatarColor(localStorage.getItem('userColor') || '#6366f1');
-    }
-}, []); // runs once on mount
+        setView('dashboard'); 
+      }
+}, []); 
 
   useEffect(() => {
-    fetchRooms();
-    if (activeRoom) {
-      const code = activeRoom.roomCode;
-      const token = localStorage.getItem('token');
-      if (token) setIsAuthenticated(true);
+    if (!activeRoom) return;
+
+    const code = activeRoom.roomCode;
+
+    fetchPolls(code);
+    fetchSummary(code);
+    fetchCanvas(code);
+    fetchChatHistory(code);
+
+    // Join the socket room
+    socket.emit("join_room", code);
+
+    // Listen for incoming messages
+    const handleMessage = (data) => {
+      setChatLog((prev) => {
+        // Prevent duplicates (since you also manually push in sendMessage)
+        const alreadyExists = prev.some(
+          (m) => m.message === data.message && m.user === data.user && m.timestamp === data.timestamp
+        );
+        return alreadyExists ? prev : [...prev, data];
+      });
+    };
+
+    const handlePollUpdate = () => {
       fetchPolls(code);
       fetchSummary(code);
-      fetchCanvas(code);
-      fetchChatHistory(code);
-      socket.on("receive_message", (data) => setChatLog((prev) => [...prev, data]));
-      socket.on("poll_updated", () => {
-        fetchPolls(code);
-        fetchSummary(code);
-      });
-      socket.on("element_received", (newEl) => {
-        setCanvasElements((prev) => [...prev, newEl]);
-      });
-    }
+    };
+
+    const handleElement = (newEl) => {
+      setCanvasElements((prev) => [...prev, newEl]);
+    };
+
+      // This runs once when the module loads
+  const token = localStorage.getItem('token');
+  if (token) {
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+
+const socket = io("http://localhost:5000");
+
+    socket.on("receive_message", handleMessage);
+    socket.on("poll_updated", handlePollUpdate);
+    socket.on("element_received", handleElement);
+
+    // Cleanup on room change or unmount
     return () => {
-      socket.off("receive_message");
-      socket.off("poll_updated");
-      socket.off("element_received");
+      socket.off("receive_message", handleMessage);
+      socket.off("poll_updated", handlePollUpdate);
+      socket.off("element_received", handleElement);
     };
   }, [activeRoom]);
+
+    // Separate effect just for initial room fetch
+  useEffect(() => {
+    fetchRooms();
+  }, []); // runs once on mount
 
   // --- MORE HANDLERS ---
   const handleDropOnCanvas = async (e) => {
@@ -276,16 +309,21 @@ useEffect(() => {
     }
   };
 
-  const sendMessage = () => {
-    if (message.trim()) {
-      const msgData = { room: activeRoom.roomCode, message, user: displayName || "User", color: avatarColor, type: 'text' };
-      socket.emit("send_message", msgData);
-      axios.patch(`http://localhost:5000/api/rooms/${activeRoom.roomCode}/edit`);
-      setChatLog((prev) => [...prev, msgData]);
-      setMessage("");
-    }
-  };
-
+ const sendMessage = () => {
+  if (message.trim()) {
+    const msgData = {
+      room: activeRoom.roomCode,
+      message,
+      user: displayName || "User",
+      color: avatarColor,
+      type: 'text',
+      timestamp: Date.now() // add this for dedup
+    };
+    socket.emit("send_message", msgData);
+    axios.patch(`http://localhost:5000/api/rooms/${activeRoom.roomCode}/edit`);
+    setMessage("");
+  }
+};
   const handleUpload = async (e, type = "file") => {
     let file;
     if (e.target && e.target.files) {
@@ -341,6 +379,11 @@ useEffect(() => {
       setIsRecording(false);
     }
   };
+
+  const [view, setView] = useState(() => {
+    return localStorage.getItem('token') ? 'dashboard' : 'login';
+  });
+
 
   // --- VIEW: LOGIN / SIGNUP ---
   if (view === 'login') {
@@ -615,7 +658,7 @@ useEffect(() => {
         onDeleteRoom={handleDeleteRoom}
         onRenameRoom={handleRenameRoom} 
         onChangeCover={handleChangeCover} 
-         onLogout={handleLogout}
+        onLogout={handleLogout}
       />
 
       <CreateModal 

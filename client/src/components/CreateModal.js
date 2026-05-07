@@ -101,7 +101,7 @@ const CreateModal = ({
                             value={roomCode}
                             onChange={(e) => setRoomCode(e.target.value)}
                         />
-                        <p className="text-[10px] text-gray-400 mt-4 text-center font-medium">Teammates will enter this code to join (Max 15 chars).</p>
+                        <p className="text-[10px] text-gray-400 mt-4 text-center font-medium">Teammates will enter this code to join.</p>
                     </div>
                     <div className="flex gap-4">
                         <button onClick={() => setStep(1)} className="flex-1 py-5 bg-gray-50 text-gray-500 font-extrabold rounded-2xl">Back</button>
