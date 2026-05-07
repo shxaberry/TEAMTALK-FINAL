@@ -148,6 +148,17 @@ function App() {
   };
 
   // --- EFFECTS ---
+
+// Set axios auth header on app load if token exists
+useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        setDisplayName(localStorage.getItem('userName') || '');
+        setAvatarColor(localStorage.getItem('userColor') || '#6366f1');
+    }
+}, []); // runs once on mount
+
   useEffect(() => {
     fetchRooms();
     if (activeRoom) {
@@ -336,10 +347,11 @@ function App() {
     return (
      <Login 
     setAuth={() => { 
+        const token = localStorage.getItem('token');
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         setView('dashboard');
         setDisplayName(localStorage.getItem('userName') || '');
         setAvatarColor(localStorage.getItem('userColor') || '#6366f1');
-       axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
       }} 
     switchToSignup={() => setView('signup')} 
     />
