@@ -1,15 +1,14 @@
 import React from 'react';
 
-const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCover }) => {
+const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCover, isJoined }) => {
     const isOwner = (room.ownerName || "").trim().toLowerCase() === (currentUser || "").trim().toLowerCase();
 
     return (
-        <div className="group bg-white border border-gray-100 p-0 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-brand-100 transition-all relative overflow-hidden flex flex-col min-h-[400px]">
+        <div className={`group bg-white border border-gray-100 p-0 rounded-[2.5rem] shadow-sm transition-all relative overflow-hidden flex flex-col min-h-[400px] ${isJoined ? 'opacity-80 cursor-not-allowed' : 'hover:shadow-2xl hover:border-brand-100 cursor-pointer'}`}>
             
             {/* 1. THE COVER IMAGE */}
             <div className="h-48 w-full bg-gray-50 relative overflow-hidden">
 
-                {/* Background image or placeholder */}
                 {room.coverImage ? (
                     <img 
                         src={room.coverImage} 
@@ -22,17 +21,29 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
                     </div>
                 )}
 
-                {/* Change Cover button — on top of image */}
-                {isOwner && (
+                {/* Lock overlay for joined rooms */}
+                {isJoined && (
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2">
+                        <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </div>
+                        <span className="text-white text-[10px] font-black uppercase tracking-widest">Enter Code to Join</span>
+                    </div>
+                )}
+
+                {/* Change Cover button — owners only */}
+                {isOwner && !isJoined && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onChangeCover(); }}
                         className="absolute bottom-4 left-4 px-3 py-1.5 bg-black/50 hover:bg-black/70 text-white text-[9px] font-black uppercase tracking-widest rounded-lg backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100">
-                        Change Cover 
+                        Change Cover 📸
                     </button>
                 )}
 
-                {/* Edit / Delete buttons — top right, owner only */}
-                {isOwner && (
+                {/* Edit / Delete buttons — owners only */}
+                {isOwner && !isJoined && (
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                             onClick={(e) => { e.stopPropagation(); onRename(); }} 
@@ -53,12 +64,15 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
             </div>
 
             {/* 2. THE CONTENT */}
-            <div className="p-8 cursor-pointer flex-1 flex flex-col" onClick={onClick}>
+            <div 
+                className={`p-8 flex-1 flex flex-col ${!isJoined ? 'cursor-pointer' : 'cursor-not-allowed'}`} 
+                onClick={!isJoined ? onClick : undefined}
+            >
                 <h3 className="text-xl font-extrabold text-gray-800 tracking-tight mb-1 group-hover:text-brand-500 transition-colors">
                     {room.title}
                 </h3>
                 <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4">
-                    Code: {room.roomCode}
+                    Code: {isJoined ? '••••••' : room.roomCode}
                 </p>
 
                 <div className="flex items-center gap-4 mb-6">
@@ -76,6 +90,16 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
                         By {isOwner ? "You" : room.ownerName}
                     </span>
                 </div>
+
+                {/* Lock notice at bottom for joined rooms */}
+                {isJoined && (
+                    <div className="mt-4 pt-4 border-t border-gray-50 flex items-center gap-2 text-gray-400">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <span className="text-[9px] font-black uppercase tracking-widest">Use room code to enter</span>
+                    </div>
+                )}
             </div>
         </div>
     );

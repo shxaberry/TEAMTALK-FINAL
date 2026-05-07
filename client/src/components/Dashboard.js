@@ -112,7 +112,6 @@ const Dashboard = ({
                                 {myDesigns.map((room) => (
                                     <motion.div key={room.id} layout>
                                         <RoomCard 
-                                            key={room.id}
                                             room={room} 
                                             onClick={() => onJoinRoom(room)} 
                                             currentUser={displayName}
@@ -163,10 +162,11 @@ const Dashboard = ({
                                     <motion.div key={room.id} layout>
                                         <RoomCard 
                                             room={room} 
-                                            onClick={() => onJoinRoom(room)} 
+                                            onClick={undefined}
                                             currentUser={displayName}
                                             onDelete={() => onDeleteRoom(room.id)}
                                             onRename={() => onRenameRoom(room.id, room.title)}
+                                            isJoined={true}
                                         />
                                     </motion.div>
                                 ))}
