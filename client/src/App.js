@@ -331,10 +331,14 @@ function App() {
   // --- VIEW: LOGIN / SIGNUP ---
   if (view === 'login') {
     return (
-      <Login 
-        setAuth={() => { setView('dashboard'); setIsAuthenticated(true); }} 
-        switchToSignup={() => setView('signup')} 
-      />
+     <Login 
+    setAuth={() => { 
+        setView('dashboard');
+        setDisplayName(localStorage.getItem('userName') || '');
+        setAvatarColor(localStorage.getItem('userColor') || '#6366f1');
+    }} 
+    switchToSignup={() => setView('signup')} 
+    />
     );
   }
 

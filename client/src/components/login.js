@@ -26,12 +26,13 @@ const Login = ({ setAuth, switchToSignup }) => {
       const res = await axios.post('http://localhost:5000/login', { email, password });
 
       localStorage.setItem('token', res.data.token);
-      localStorage.setItem('username', res.data.username);
+      localStorage.setItem('userName', res.data.username);
+      localStorage.setItem('userColor', res.data.avatarColor || '#6366f1');
 
       setSuccess('Login successful! Redirecting...');
       
       setTimeout(() => {
-        setAuth(); // Changes view to Dashboard in App.js
+        setAuth(); 
       }, 1000);
 
     } catch (err) {
