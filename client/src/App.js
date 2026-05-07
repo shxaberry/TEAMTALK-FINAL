@@ -8,6 +8,9 @@ import Dashboard from './components/Dashboard';
 import Login from './components/login';
 import Signup from './components/signup';
 
+// Add this right after your imports
+axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
+
 const socket = io("http://localhost:5000"); 
 
 function App() {
@@ -336,7 +339,8 @@ function App() {
         setView('dashboard');
         setDisplayName(localStorage.getItem('userName') || '');
         setAvatarColor(localStorage.getItem('userColor') || '#6366f1');
-    }} 
+       axios.defaults.headers.common['Authorization'] = `Bearer ${localStorage.getItem('token')}`;
+      }} 
     switchToSignup={() => setView('signup')} 
     />
     );
