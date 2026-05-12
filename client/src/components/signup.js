@@ -2,18 +2,20 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './signup.css';
 
+// ── Single source of truth for the backend URL ────────────────────────────────
+const API = 'http://localhost:5000';
 const Signup = ({ switchToLogin }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword]             = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +30,6 @@ const Signup = ({ switchToLogin }) => {
 
     const { firstName, lastName, email, password, confirmPassword } = formData;
 
-    // Validations
     if (!firstName || !lastName || !email || !password || !confirmPassword) {
       return setError('Please fill in all fields.');
     }
@@ -41,30 +42,36 @@ const Signup = ({ switchToLogin }) => {
 
     setLoading(true);
 
-    try {     
-   await axios.post('http://localhost:5000/signup',
-  { firstName, lastName, email, password });
+    try {
+      // Send firstName + lastName + email directly.
+      // Server's /api/signup now accepts { firstName, lastName, email, password, color }
+      // and builds the username automatically from firstName + lastName.
+      await axios.post(`${API}/api/signup`, {
+        firstName: firstName.trim(),
+        lastName:  lastName.trim(),
+        email,
+        password,
+        color: '#6366f1',
+      });
 
       setSuccess('Account created! Redirecting to sign in...');
-      
-      setTimeout(() => {
-        switchToLogin(); // Takes user back to the Login screen
-      }, 2000);
+      setTimeout(() => switchToLogin(), 2000);
 
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Try a different email.');
+      // Server returns { message: "..." }
+      setError(err.response?.data?.message || 'Registration failed. Try a different username.');
     } finally {
       setLoading(false);
     }
   };
 
-const eyeOpen = (
+  const eyeOpen = (
     <>
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
       <circle cx="12" cy="12" r="3" />
     </>
   );
-const eyeOff = (
+  const eyeOff = (
     <>
       <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24M1 1l22 22" />
     </>
@@ -84,7 +91,7 @@ const eyeOff = (
         <p className="subtext">Create your workspace — collaborate,<br/>share, and build together.</p>
 
         <form onSubmit={handleSignup} noValidate>
-          {error && <div className="alert error show">{error}</div>}
+          {error   && <div className="alert error show">{error}</div>}
           {success && <div className="alert success show">{success}</div>}
 
           <div className="row">
@@ -106,13 +113,13 @@ const eyeOff = (
           <div className="field">
             <label htmlFor="password">Password</label>
             <div className="input-wrap">
-              <input 
-                type={showPassword ? "text" : "password"} 
-                id="password" 
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="has-eye" 
-                autoComplete="new-password" 
+                className="has-eye"
+                autoComplete="new-password"
               />
               <button type="button" className="eye-btn" onClick={() => setShowPassword(!showPassword)}>
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -125,13 +132,13 @@ const eyeOff = (
           <div className="field">
             <label htmlFor="confirmPassword">Confirm Password</label>
             <div className="input-wrap">
-              <input 
-                type={showConfirmPassword ? "text" : "password"} 
-                id="confirmPassword" 
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                id="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="has-eye" 
-                autoComplete="new-password" 
+                className="has-eye"
+                autoComplete="new-password"
               />
               <button type="button" className="eye-btn" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -147,7 +154,8 @@ const eyeOff = (
         </form>
 
         <p className="footer-text">
-          Already have an account? <span className="link" onClick={switchToLogin}>Sign in</span>
+          Already have an account?{' '}
+          <span className="link" onClick={switchToLogin}>Sign in</span>
         </p>
       </div>
     </div>

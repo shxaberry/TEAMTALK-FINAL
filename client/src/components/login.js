@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './login.css';
 
+// ── Single source of truth for the backend URL ────────────────────────────────
+const API = 'http://localhost:5000';
 const Login = ({ setAuth, switchToSignup }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError]               = useState('');
+  const [success, setSuccess]           = useState('');
+  const [loading, setLoading]           = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -22,21 +24,23 @@ const Login = ({ setAuth, switchToSignup }) => {
     setLoading(true);
 
     try {
-      // Points to your Railway Backend
-      const res = await axios.post('http://localhost:5000/login', { email, password });
+      // FIX: was /login — server listens on /api/login
+      // FIX: field sent as `email`; server accepts username OR email, so this works fine.
+     const res = await axios.post(`${API}/api/login`, { username: email, password });
 
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('userName', res.data.username);
-      localStorage.setItem('userColor', res.data.avatarColor || '#6366f1');
+      localStorage.setItem('userColor', res.data.color || '#6366f1');
 
       setSuccess('Login successful! Redirecting...');
-      
+
       setTimeout(() => {
-        setAuth(); 
+        setAuth();
       }, 1000);
 
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      // FIX: server returns { message }, not { error }
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -54,36 +58,38 @@ const Login = ({ setAuth, switchToSignup }) => {
         </div>
 
         <h1>Welcome back</h1>
-        <p className="subtext">Log in in to access your TeamTalk workspace.</p>
+        <p className="subtext">Log in to access your TeamTalk workspace.</p>
 
         <form onSubmit={handleLogin} noValidate>
-          {error && <div className="alert error">{error}</div>}
+          {error   && <div className="alert error">{error}</div>}
           {success && <div className="alert success">{success}</div>}
 
           <div className="field">
-            <label>Email</label>
-            <input 
-              type="email" 
-              placeholder="name@company.com" 
+            <label htmlFor="login-email">Email or Username</label>
+            <input
+              id="login-email"
+              type="text"
+              placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email" 
+              autoComplete="username"
             />
           </div>
 
           <div className="field">
-            <label>Password</label>
+            <label htmlFor="login-password">Password</label>
             <div className="input-wrap">
-              <input 
-                type={showPassword ? "text" : "password"} 
-                className="has-eye" 
+              <input
+                id="login-password"
+                type={showPassword ? 'text' : 'password'}
+                className="has-eye"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password" 
+                autoComplete="current-password"
               />
-              <button 
-                type="button" 
-                className="eye-btn" 
+              <button
+                type="button"
+                className="eye-btn"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -106,7 +112,8 @@ const Login = ({ setAuth, switchToSignup }) => {
         </form>
 
         <p className="footer-text">
-          Don't have an account? <span className="link" onClick={switchToSignup}>Sign up</span>
+          Don't have an account?{' '}
+          <span className="link" onClick={switchToSignup}>Sign up</span>
         </p>
       </div>
     </div>

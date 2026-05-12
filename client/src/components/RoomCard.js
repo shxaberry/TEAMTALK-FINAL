@@ -1,8 +1,7 @@
 import React from 'react';
 
 const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCover, isJoined }) => {
-    const isOwner = (room.ownerName || "").trim().toLowerCase() === (currentUser || "").trim().toLowerCase();
-
+const isOwner = (room.owner_name || room.ownerName || "").trim().toLowerCase() === (currentUser || "").trim().toLowerCase();
     return React.createElement('div', {
         className: `group bg-white border border-gray-100 p-0 rounded-[2.5rem] shadow-sm transition-all relative overflow-hidden flex flex-col min-h-[400px] ${isJoined ? 'opacity-80 cursor-not-allowed' : 'hover:shadow-2xl hover:border-brand-100 cursor-pointer'}`
     },
@@ -10,8 +9,8 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
         // 1. THE COVER IMAGE
         React.createElement('div', { className: "h-48 w-full bg-gray-50 relative overflow-hidden" },
 
-            room.coverImage
-                ? React.createElement('img', { src: room.coverImage, alt: "cover", className: "w-full h-full object-cover" })
+            (room.coverImage || room.cover_image)
+                ? React.createElement('img', { src: room.coverImage || room.cover_image, alt: "cover", className: "w-full h-full object-cover" })
                 : React.createElement('div', { className: "w-full h-full bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center" },
                     React.createElement('svg', { className: "w-10 h-10 text-indigo-200", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24" },
                         React.createElement('path', { strokeLinecap: "round", strokeLinejoin: "round", strokeWidth: "1.5", d: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" })
@@ -62,10 +61,6 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
         },
             React.createElement('h3', { className: "text-xl font-extrabold text-gray-800 tracking-tight mb-1 group-hover:text-brand-500 transition-colors" }, room.title),
 
-            React.createElement('p', { className: "text-[10px] font-black text-gray-300 uppercase tracking-widest mb-4" },
-                "Code: ", isJoined ? '••••••' : room.roomCode
-            ),
-
             React.createElement('div', { className: "flex items-center gap-4 mb-6" },
                 // Eye icon — Visits
                 React.createElement('span', { className: "flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-tight" },
@@ -87,10 +82,11 @@ const RoomCard = ({ room, onClick, currentUser, onDelete, onRename, onChangeCove
             React.createElement('div', { className: "mt-auto flex items-center gap-3 pt-4 border-t border-gray-50" },
                 React.createElement('div', {
                     className: "w-6 h-6 rounded-full flex items-center justify-center text-[7px] font-black text-white shadow-sm",
-                    style: { backgroundColor: room.avatarColor }
-                }, room.ownerName ? room.ownerName.substring(0, 2).toUpperCase() : "??"),
-                React.createElement('span', { className: "text-[11px] font-bold text-gray-500 italic" },
-                    "By ", isOwner ? "You" : room.ownerName
+                    style: { backgroundColor: room.avatar_color || room.avatarColor }                
+                    },
+                    (room.owner_name || room.ownerName) ? (room.owner_name || room.ownerName).substring(0, 2).toUpperCase() : "??"),
+                    React.createElement('span', { className: "text-[11px] font-bold text-gray-500 italic" },
+                    "By ", isOwner ? "You" : (room.owner_name || room.ownerName)
                 )
             ),
 

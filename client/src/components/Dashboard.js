@@ -18,13 +18,13 @@ const Dashboard = ({
     
     const currentUser = (displayName || "").trim().toLowerCase();
 
-    const myDesigns = rooms.filter(r => 
-        (r.ownerName || "").trim().toLowerCase() === currentUser
-    );
+   const myDesigns = rooms.filter(r => 
+    (r.owner_name || r.ownerName || "").trim().toLowerCase() === currentUser
+);
 
-    const joinedRooms = rooms.filter(r => 
-        (r.ownerName || "").trim().toLowerCase() !== currentUser
-    );
+const joinedRooms = rooms.filter(r => 
+    (r.owner_name || r.ownerName || "").trim().toLowerCase() !== currentUser
+);
 
     const userColor = localStorage.getItem("userColor") || "#6366f1";
 
