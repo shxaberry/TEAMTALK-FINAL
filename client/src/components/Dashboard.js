@@ -112,6 +112,8 @@ const joinedRooms = rooms.filter(r =>
                                 <p className="text-sm text-gray-400 mt-3 text-center leading-relaxed font-medium">Create a room with a<br/>custom code</p>
                             </div>
 
+                        
+
                             <AnimatePresence>
                                 {myDesigns.map((room) => (
                                     <motion.div key={room.id} layout>

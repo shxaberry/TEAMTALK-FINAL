@@ -193,6 +193,92 @@ function ErrorNotification({ message, onClose }) {
   );
 }
 
+function DeleteConfirmModal({ roomTitle, onConfirm, onCancel }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    await onConfirm();
+    setIsDeleting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 flex flex-col items-center text-center gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+          <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <div>
+          <p className="text-lg font-extrabold text-gray-800 mb-1.5">Delete project?</p>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            <span className="font-bold text-gray-700">{roomTitle}</span> and all its messages, polls, and files will be permanently removed. This can't be undone.
+          </p>
+        </div>
+        <div className="flex gap-3 w-full mt-1">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={isDeleting}
+            className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 transition disabled:opacity-60"
+          >
+            {isDeleting ? 'Deleting…' : 'Delete project'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RenameModal({ initialTitle, onConfirm, onCancel }) {
+  const [title, setTitle] = useState(initialTitle);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md px-4">
+      <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-sm p-8 animate-in fade-in zoom-in duration-300">
+        <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+        
+        <h3 className="text-xl font-black text-gray-900 mb-2">Rename Project</h3>
+        <p className="text-sm text-gray-500 mb-6">Give your workspace a clear and descriptive name.</p>
+
+        <input 
+          autoFocus
+          className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all mb-8"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onConfirm(title)}
+          placeholder="Project name..."
+        />
+
+        <div className="flex gap-3 w-full">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(title)}
+            className="flex-1 py-4 rounded-2xl bg-brand-500 text-white text-sm font-black hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReplyBanner({ replyTo, onClear }) {
   if (!replyTo) return null;
   return (
@@ -250,6 +336,9 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(true);
   const [errorMessage, setErrorMessage]     = useState('');
 
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title }
+  const [renameTarget, setRenameTarget] = useState(null); // { id, title }
+
   const socketRef  = useRef(null);
   const chatEndRef  = useRef(null);
   const fileInputRef = useRef(null);
@@ -257,6 +346,7 @@ function App() {
   const sock = () => {
     if (!socketRef.current || !socketRef.current.connected) socketRef.current = getSocket();
     return socketRef.current;
+
   };
 
   // ── Auth init ─────────────────────────────────────────────
@@ -400,16 +490,38 @@ function App() {
   };
 
   const handleDeleteRoom = async (roomId) => {
-    if (!window.confirm('Delete this project permanently?')) return;
-    try { await axios.delete(`${API}/api/rooms/${roomId}`); fetchRooms(); }
-    catch { setErrorMessage('Could not delete the room.'); }
+    const room = rooms.find(r => r.id === roomId);
+    setDeleteTarget({ id: roomId, title: room?.title || 'this project' });
   };
 
-  const handleRenameRoom = async (roomId, currentTitle) => {
-    const newTitle = window.prompt('Enter new project name:', currentTitle);
-    if (newTitle?.trim() && newTitle !== currentTitle) {
-      try { await axios.put(`${API}/api/rooms/${roomId}`, { title: newTitle }); fetchRooms(); }
-      catch { setErrorMessage('Could not rename the room.'); }
+  const confirmDeleteRoom = async () => {
+    try {
+      await axios.delete(`${API}/api/rooms/${deleteTarget.id}`);
+      fetchRooms();
+    } catch {
+      setErrorMessage('Could not delete the room.');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleRenameRoom = (roomId, currentTitle) => {
+    setRenameTarget({ id: roomId, title: currentTitle });
+  };
+
+  const confirmRenameRoom = async (newTitle) => {
+    if (!newTitle?.trim() || newTitle === renameTarget.title) {
+      setRenameTarget(null);
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/api/rooms/${renameTarget.id}`, { title: newTitle });
+      fetchRooms();
+    } catch {
+      setErrorMessage('Could not rename the room.');
+    } finally {
+      setRenameTarget(null);
     }
   };
 
@@ -1062,7 +1174,7 @@ function App() {
   );
 
   // ── Dashboard view ────────────────────────────────────────
-  return (
+return (
     <>
       <Dashboard
         rooms={rooms} displayName={displayName}
@@ -1086,6 +1198,21 @@ function App() {
         avatarColor={avatarColor} setAvatarColor={setAvatarColor}
         handleJoin={handleJoinRoom}
       />
+      {deleteTarget && (
+        <DeleteConfirmModal
+          roomTitle={deleteTarget.title}
+          onConfirm={confirmDeleteRoom}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          initialTitle={renameTarget.title}
+          onConfirm={confirmRenameRoom}
+          onCancel={() => setRenameTarget(null)}
+        />
+      )}
     </>
   );
 }
