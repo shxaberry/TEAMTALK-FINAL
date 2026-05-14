@@ -359,7 +359,27 @@ function App() {
         setDisplayName(res.data.username || localStorage.getItem('userName') || '');
         setAvatarColor(res.data.color   || localStorage.getItem('userColor') || '#6366f1');
         socketRef.current = getSocket();
-        setView('dashboard');
+
+        // 👇 restore room if user was inside one before refresh
+        const savedRoom = localStorage.getItem('activeRoom');
+        if (savedRoom) {
+          try {
+            const room = JSON.parse(savedRoom);
+            setActiveRoom(room);
+            setView('dashboard');
+            const s = getSocket();
+            s.emit('join_room', room.roomCode);
+            fetchChatHistory(room.roomCode);
+            fetchPolls(room.roomCode);
+            fetchSummary(room.roomCode);
+            fetchCanvas(room.roomCode);
+          } catch {
+            localStorage.removeItem('activeRoom');
+            setView('dashboard');
+          }
+        } else {
+          setView('dashboard');
+        }
       })
       .catch(() => {
         localStorage.removeItem('token');
@@ -462,8 +482,8 @@ function App() {
     if (!code) return;
     const normalizedRoom = { ...room, roomCode: code };
     setActiveRoom(normalizedRoom);
+    localStorage.setItem('activeRoom', JSON.stringify(normalizedRoom)); // 👈 save it
     sock().emit('join_room', code);
-    //  FIX: visit increments properly now
     axios.patch(`${API}/api/rooms/${code}/visit`).catch(console.error);
     fetchCanvas(code); fetchChatHistory(code); fetchPolls(code); fetchSummary(code);
   };
@@ -713,7 +733,13 @@ function App() {
       <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => { setActiveRoom(null); setChatLog([]); setPolls([]); fetchRooms(); }}
+            onClick={() => { 
+              setActiveRoom(null); 
+              setChatLog([]); 
+              setPolls([]); 
+              localStorage.removeItem('activeRoom'); // 👈 clear it
+              fetchRooms(); 
+            }}
             className="w-10 h-10 flex items-center justify-center bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition"
           >
             <Icon.ArrowLeft />
