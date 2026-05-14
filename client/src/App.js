@@ -128,37 +128,42 @@ const Icon = {
 // ═══════════════════════════════════════════════════════════
 //  POLL COUNTDOWN
 // ═══════════════════════════════════════════════════════════
+function normalizeEndsAt(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // If it has Z or +offset it's UTC — parse directly
+  if (s.endsWith('Z') || s.includes('+')) return new Date(s).getTime();
+  // MySQL DATETIME string like "2026-05-13 11:51:09" — treat as LOCAL time
+  return new Date(s.replace(' ', 'T')).getTime();
+}
+
 function PollCountdown({ endsAt }) {
   const [timeLeft, setTimeLeft] = useState('');
   const [expired, setExpired]   = useState(false);
 
   useEffect(() => {
-    if (!endsAt) return;
-    // Normalize: MySQL returns "2026-05-13 10:30:00" (no Z), ISO strings already have Z
-    const raw = String(endsAt);
-    const normalized = raw.includes('T') && raw.endsWith('Z')
-      ? raw                                    // already ISO UTC e.g. "2026-05-13T10:30:00.000Z"
-      : raw.replace(' ', 'T') + 'Z';           // MySQL datetime → treat as UTC
+    const endMs = normalizeEndsAt(endsAt);
+    if (!endMs || isNaN(endMs)) return;
 
-    const endMs = new Date(normalized).getTime();
-
+    let id;  // declare before tick so clearInterval(id) works
     const tick = () => {
       const diff = endMs - Date.now();
-      if (diff <= 0) { setExpired(true); setTimeLeft('Ended'); return; }
+      if (diff <= 0) { setExpired(true); setTimeLeft('Ended'); clearInterval(id); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
       setTimeLeft(h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`);
     };
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [endsAt]);
 
   if (!endsAt) return null;
   return (
     <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${expired ? 'bg-gray-100 text-gray-400' : 'bg-amber-50 text-amber-600'}`}>
-      <Icon.Clock /> {timeLeft}
+      <Icon.Clock /> {expired ? 'Ended' : timeLeft || '...'}
     </div>
   );
 }
@@ -498,27 +503,69 @@ function App() {
     } catch { setErrorMessage('Failed to upload file. Please try again.'); }
   };
 
-  const startRecording = async () => {
+  const chunksRef = useRef([]);
+
+  const toggleRecording = async () => {
+    // If already recording — stop it
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    // Start recording
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setErrorMessage('Microphone not supported in this browser.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      const chunks = [];
-      mediaRecorderRef.current.ondataavailable = (e) => chunks.push(e.data);
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        handleUpload(new File([blob], 'voice-note.webm', { type: 'audio/webm' }), 'voice');
-      };
-      mediaRecorderRef.current.onerror = () => setErrorMessage('Microphone error.');
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch { setErrorMessage('Microphone access denied.'); }
-  };
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/ogg';
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop(); setIsRecording(false);
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType });
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        if (blob.size > 0) {
+          handleUpload(new File([blob], 'voice-note.webm', { type: mimeType }), 'voice');
+        }
+        stream.getTracks().forEach(t => t.stop());
+        chunksRef.current = [];
+      };
+
+      recorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+        setErrorMessage('Recording error. Please try again.');
+        setIsRecording(false);
+      };
+
+      recorder.start(100); // collect data every 100ms
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Microphone error:', err.name, err.message);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMessage('Microphone blocked by system. Go to Windows Settings → Privacy → Microphone → allow Chrome.');
+      } else if (err.name === 'NotFoundError') {
+        setErrorMessage('No microphone detected. Please connect one and try again.');
+      } else {
+        setErrorMessage('Microphone error: ' + err.name + ' — ' + err.message);
+      }
     }
   };
+
+
 
   // ── Polls ─────────────────────────────────────────────────
   const handleVote = async (optionId) => {
@@ -567,9 +614,11 @@ function App() {
   const isPollExpired = (poll) => {
     const raw = poll.ends_at || poll.endsAt;
     if (!raw) return false;
-    const s = String(raw);
-    const normalized = s.includes('T') && s.endsWith('Z') ? s : s.replace(' ', 'T') + 'Z';
-    return new Date(normalized).getTime() < Date.now();
+    const s = String(raw).trim();
+    const endMs = (s.endsWith('Z') || s.includes('+'))
+      ? new Date(s).getTime()
+      : new Date(s.replace(' ', 'T') + 'Z').getTime();
+    return !isNaN(endMs) && endMs < Date.now();
   };
 
   // ── Helper: get fileUrl from either camelCase or snake_case ─────────────────
@@ -733,13 +782,23 @@ function App() {
                                     const audioEl = document.getElementById(`audio-${i}`);
                                     if (!audioEl) return;
                                     if (playingId === i) { audioEl.pause(); setPlayingId(null); }
-                                    else { audioEl.play().catch(() => setPlayingId(null)); setPlayingId(i); audioEl.onended = () => setPlayingId(null); }
+                                    else {
+                                      // Reload src to ensure fresh load before playing
+                                      audioEl.load();
+                                      audioEl.play().then(() => {
+                                        setPlayingId(i);
+                                        audioEl.onended = () => setPlayingId(null);
+                                      }).catch((e) => {
+                                        console.error('Audio play error:', e);
+                                        setPlayingId(null);
+                                      });
+                                    }
                                   }}
                                   className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white shrink-0 hover:bg-white/30 transition-all"
                                 >
                                   {playingId === i ? <Icon.Pause /> : <Icon.Play />}
                                 </button>
-                                {getFileUrl(msg) && <audio id={`audio-${i}`} src={getFileUrl(msg)} />}
+                                {getFileUrl(msg) && <audio id={`audio-${i}`} src={getFileUrl(msg)} preload="auto" />}
                                 <div className="flex items-end gap-1 h-7 flex-1">
                                   {Array.from({ length: 14 }, (_, v) => (
                                     <div
@@ -946,7 +1005,7 @@ function App() {
                       onKeyDown={e => e.key === 'Enter' && sendMessage()}
                     />
                     <button
-                      onMouseDown={startRecording} onMouseUp={stopRecording}
+                      onClick={toggleRecording}
                       className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'bg-white text-gray-400 shadow-sm hover:text-brand-500'}`}
                       title="Hold to record voice"
                     >
