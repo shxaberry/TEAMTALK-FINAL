@@ -14,7 +14,7 @@ const Groq = require('groq-sdk');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SECRET_KEY = process.env.SECRET_KEY || 'fallback_local_secret';
-const BASE_URL   = process.env.BASE_URL   || 'http://localhost:5000';
+const BASE_URL   = process.env.BASE_URL   || 'https://adorable-peace-production-50ae.up.railway.app';
 const PORT       = process.env.PORT       || 5000;
 
 // ── App ───────────────────────────────────────────────────────────────────────

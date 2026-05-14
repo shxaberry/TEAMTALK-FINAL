@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/login';
 import Signup from './components/signup';
 
-const API = 'http://localhost:5000';
+const API = 'https://adorable-peace-production-50ae.up.railway.app';
 
 let socket = null;
 function getSocket() {

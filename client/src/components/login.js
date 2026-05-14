@@ -3,7 +3,7 @@ import axios from 'axios';
 import './login.css';
 
 // ── Single source of truth for the backend URL ────────────────────────────────
-const API = 'http://localhost:5000';
+const API = 'https://adorable-peace-production-50ae.up.railway.app';
 const Login = ({ setAuth, switchToSignup }) => {
   const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
