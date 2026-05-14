@@ -66,22 +66,22 @@ async function connectDB() {
       });
       await pool.query('SELECT 1');
       db = pool;
-      console.log(` DB connected — ${host}:${port}/${database}`);
+      console.log(` ✅ DB connected — ${host}:${port}/${database}`);
 
-      // ── One-time schema safety patch ───────────────────────
-      // Makes email/color nullable so signup never crashes on missing columns
+      // ── CREATE TABLES IF THEY DON'T EXIST ──
+      // This creates the 'users' table so you can actually sign up
       await db.query(`
-        ALTER TABLE users
-          MODIFY COLUMN email VARCHAR(255) NULL DEFAULT NULL,
-          MODIFY COLUMN color VARCHAR(20)  NULL DEFAULT '#6366f1'
-      `).catch(() => {}); // safe to ignore if columns already correct
-
-      // Keep-alive ping every 30s
-      setInterval(async () => {
-        try { await db.query('SELECT 1'); }
-        catch (e) { console.warn(' Keep-alive failed, reconnecting...'); db = null; connectDB(); }
-      }, 30000);
-
+        CREATE TABLE IF NOT EXISTS users (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          username VARCHAR(255) NOT NULL UNIQUE,
+          email VARCHAR(255) NULL,
+          password VARCHAR(255) NOT NULL,
+          color VARCHAR(20) DEFAULT '#6366f1',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      
+      console.log(" ✅ Database tables verified/created.");
       return;
     } catch (err) {
       console.warn(`✗ ${attempt.label} → ${err.message}`);
@@ -496,7 +496,10 @@ Write the summary now:`;
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-server.listen(PORT, () => {
+const serverInstance = server.listen(PORT, () => {
   console.log(` Server running on port ${PORT}`);
   console.log(`   BASE_URL: ${BASE_URL}`);
 });
+
+// Allow the server more time to receive large files (long recordings)
+serverInstance.timeout = 120000; // 2 minutes

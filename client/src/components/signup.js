@@ -58,8 +58,13 @@ const Signup = ({ switchToLogin }) => {
       setTimeout(() => switchToLogin(), 2000);
 
     } catch (err) {
-      // Server returns { message: "..." }
-      setError(err.response?.data?.message || 'Registration failed. Try a different username.');
+      // This will now show the REAL error from the server terminal
+      const serverMessage = err.response?.data?.message;
+      if (serverMessage) {
+        setError(serverMessage);
+      } else {
+        setError('Connection failed. Is the server running?');
+      }
     } finally {
       setLoading(false);
     }

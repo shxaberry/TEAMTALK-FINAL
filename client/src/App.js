@@ -498,27 +498,56 @@ function App() {
     } catch { setErrorMessage('Failed to upload file. Please try again.'); }
   };
 
-  const startRecording = async () => {
+ const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream);
-      const chunks = [];
-      mediaRecorderRef.current.ondataavailable = (e) => chunks.push(e.data);
-      mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        handleUpload(new File([blob], 'voice-note.webm', { type: 'audio/webm' }), 'voice');
-      };
-      mediaRecorderRef.current.onerror = () => setErrorMessage('Microphone error.');
-      mediaRecorderRef.current.start();
-      setIsRecording(true);
-    } catch { setErrorMessage('Microphone access denied.'); }
-  };
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus' // Tell it exactly what format to use
+      });
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop(); setIsRecording(false);
+      const chunks = [];
+
+      // This part captures the audio pieces
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorderRef.current.onstop = () => {
+        // Combine all pieces into one final file
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        
+        // If the file is basically empty (less than 1kb), don't send it
+        if (blob.size < 100) {
+          setErrorMessage("Recording was too short or failed to capture audio.");
+          return;
+        }
+
+        const audioFile = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
+        handleUpload(audioFile, 'voice');
+        
+        // Stop the microphone light from staying on
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorderRef.current.onerror = () => setErrorMessage('Microphone error.');
+
+      mediaRecorderRef.current.start(1000); 
+      
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Mic Error:", err);
+      setErrorMessage('Microphone access denied or not found.');
     }
   };
+
+ const stopRecording = () => {
+  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+  }
+};
 
   // ── Polls ─────────────────────────────────────────────────
   const handleVote = async (optionId) => {
@@ -732,14 +761,43 @@ function App() {
                                   onClick={() => {
                                     const audioEl = document.getElementById(`audio-${i}`);
                                     if (!audioEl) return;
-                                    if (playingId === i) { audioEl.pause(); setPlayingId(null); }
-                                    else { audioEl.play().catch(() => setPlayingId(null)); setPlayingId(i); audioEl.onended = () => setPlayingId(null); }
+
+                                    if (playingId === i) {
+                                      audioEl.pause();
+                                      setPlayingId(null);
+                                    } else {
+                                      // If a different audio was playing, stop it first
+                                      if (playingId !== null) {
+                                        const oldAudio = document.getElementById(`audio-${playingId}`);
+                                        if (oldAudio) oldAudio.pause();
+                                      }
+
+                                      // Play the new audio
+                                      audioEl.play()
+                                        .then(() => setPlayingId(i))
+                                        .catch((err) => {
+                                          console.error("Playback failed:", err);
+                                          setPlayingId(null);
+                                        });
+
+                                      audioEl.onended = () => setPlayingId(null);
+                                    }
                                   }}
                                   className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white shrink-0 hover:bg-white/30 transition-all"
                                 >
                                   {playingId === i ? <Icon.Pause /> : <Icon.Play />}
                                 </button>
-                                {getFileUrl(msg) && <audio id={`audio-${i}`} src={getFileUrl(msg)} />}
+                                
+                                {/* The Audio Tag - We add preload and crossOrigin */}
+                                {getFileUrl(msg) && (
+                                  <audio 
+                                    id={`audio-${i}`} 
+                                    src={getFileUrl(msg)} 
+                                    preload="auto"
+                                    className="hidden"
+                                  />
+                                )}
+
                                 <div className="flex items-end gap-1 h-7 flex-1">
                                   {Array.from({ length: 14 }, (_, v) => (
                                     <div
@@ -938,20 +996,26 @@ function App() {
                       <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleUpload(e)} />
                     </label>
                     <input
-                      type="text"
-                      className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
-                      placeholder={replyTo ? `Reply to ${replyTo.user}...` : 'Message team...'}
-                      value={message}
-                      onChange={e => setMessage(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                    />
+  type="text"
+  className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
+  placeholder={isRecording ? "Recording audio..." : (replyTo ? `Reply to ${replyTo.user}...` : 'Message team...')}
+  value={message}
+  disabled={isRecording} // Optional: prevent typing while recording
+  onChange={e => setMessage(e.target.value)}
+  onKeyDown={e => e.key === 'Enter' && sendMessage()}
+/>
                     <button
-                      onMouseDown={startRecording} onMouseUp={stopRecording}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'bg-white text-gray-400 shadow-sm hover:text-brand-500'}`}
-                      title="Hold to record voice"
-                    >
-                      <Icon.Mic />
-                    </button>
+  onClick={() => isRecording ? stopRecording() : startRecording()}
+  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+    isRecording 
+      ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' 
+      : 'bg-white text-gray-400 shadow-sm hover:text-brand-500 hover:bg-brand-50'
+  }`}
+  title={isRecording ? "Click to stop recording" : "Click to start recording"}
+>
+  {/* Optional: You can change the icon to an 'X' or 'Stop' icon when recording */}
+  {isRecording ? <Icon.X /> : <Icon.Mic />}
+</button>
                     <button onClick={sendMessage} className="w-10 h-10 bg-brand-500 text-white rounded-xl shadow-lg shadow-brand-500/30 flex items-center justify-center hover:bg-brand-600 transition">
                       <Icon.Send />
                     </button>
