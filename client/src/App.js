@@ -25,7 +25,11 @@ if (savedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${saved
 axios.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // 1. Check if the error is from the Login or Signup API
+    const isAuthPath = err.config?.url?.includes('/api/login') || err.config?.url?.includes('/api/signup');
+
+    // 2. ONLY reload if it's a 401 AND NOT an auth attempt
+    if (err.response?.status === 401 && !isAuthPath) {
       localStorage.removeItem('token');
       localStorage.removeItem('userName');
       localStorage.removeItem('userColor');
@@ -33,6 +37,8 @@ axios.interceptors.response.use(
       if (socket) { socket.disconnect(); socket = null; }
       window.location.reload();
     }
+    
+    // Always return the error so the .catch() in Login.js can catch it!
     return Promise.reject(err);
   }
 );
@@ -190,7 +196,7 @@ function ErrorNotification({ message, onClose }) {
   }, [message, onClose]);
   if (!message) return null;
   return (
-    <div className="fixed top-4 right-4 z-[100] bg-red-50 border border-red-200 rounded-2xl px-6 py-4 shadow-lg flex items-start gap-3 max-w-sm">
+    <div className="fixed top-4 right-4 z-[200] bg-red-50 border border-red-200 rounded-2xl px-6 py-4 shadow-lg flex items-start gap-3 max-w-sm">
       <Icon.AlertCircle />
       <div className="flex-1"><p className="text-sm font-bold text-red-800">{message}</p></div>
       <button onClick={onClose} className="text-red-400 hover:text-red-600 transition shrink-0"><Icon.X /></button>
@@ -287,7 +293,7 @@ function RenameModal({ initialTitle, onConfirm, onCancel }) {
 function ReplyBanner({ replyTo, onClear }) {
   if (!replyTo) return null;
   return (
-    <div className="mx-2 mb-2 px-4 py-3 bg-brand-50 border-l-4 border-brand-500 rounded-xl flex items-start justify-between gap-3">
+    <div className="mx-2 mb-2 px-4 py-3 bg-brand-50 rounded-xl flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-[9px] font-black text-brand-500 uppercase tracking-widest mb-0.5">Replying to {replyTo.user}</p>
         <p className="text-[11px] text-gray-500 truncate">
@@ -347,12 +353,22 @@ function App() {
   const socketRef  = useRef(null);
   const chatEndRef  = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null); // <--- Add this line
 
   const sock = () => {
     if (!socketRef.current || !socketRef.current.connected) socketRef.current = getSocket();
     return socketRef.current;
 
   };
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to shrink if text is deleted
+      textareaRef.current.style.height = "auto"; 
+      // Set new height based on content, maxing out at 150px
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + "px";
+    }
+  }, [message]);
 
   // ── Auth init ─────────────────────────────────────────────
   useEffect(() => {
@@ -776,7 +792,6 @@ function App() {
   if (activeRoom) return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans overflow-hidden">
       {previewImage && <ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />}
-      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} />
 
       {/* HEADER */}
       <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-20 shadow-sm shrink-0">
@@ -1128,18 +1143,24 @@ function App() {
               {activeTab === 'chat' && (
                 <div className="p-4 border-t border-gray-100 bg-white shrink-0">
                   <ReplyBanner replyTo={replyTo} onClear={() => setReplyTo(null)} />
-                  <div className="flex items-center gap-2 bg-[#F8F9FD] p-2 rounded-2xl border border-gray-100">
+                  <div className="flex items-end gap-2 bg-[#F8F9FD] p-2 rounded-2xl border border-gray-100">
                     <label className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-brand-500 cursor-pointer transition rounded-xl hover:bg-brand-50">
                       <Icon.Paperclip />
                       <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleUpload(e)} />
                     </label>
-                    <input
-                      type="text"
-                      className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
+                    <textarea
+                      ref={textareaRef}
+                      rows={1}
+                      className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300 resize-none overflow-y-auto leading-relaxed"
                       placeholder={replyTo ? `Reply to ${replyTo.user}...` : 'Message team...'}
                       value={message}
                       onChange={e => setMessage(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendMessage();
+                        }
+                      }}
                     />
                     <button
                       onClick={toggleRecording}
@@ -1260,6 +1281,9 @@ function App() {
   // ── Dashboard view ────────────────────────────────────────
 return (
     <>
+
+      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} /> {/* <--- Add this here */}
+      
       <Dashboard
         rooms={rooms} displayName={displayName}
         setIsCreateModalOpen={setIsCreateModalOpen} setIsJoinModalOpen={setIsJoinModalOpen}
