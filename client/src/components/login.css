@@ -12,6 +12,10 @@
 .card {
   width: 100%;
   max-width: 460px;
+  background: white;        /* Add this */
+  padding: 40px;            /* Add this */
+  border-radius: 32px;      /* Add this */
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); /* Add this */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -125,7 +129,22 @@ input:focus {
   margin-bottom: 1rem;
 }
 
-.alert.error { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+.alert.error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  /* Add this animation line */
+  animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+  transform: translate3d(0, 0, 0);
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
 .alert.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
 
 .footer-text { margin-top: 1.5rem; color: #666; font-size: 0.9rem; }

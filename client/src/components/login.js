@@ -60,7 +60,16 @@ const Login = ({ setAuth, switchToSignup }) => {
         <p className="subtext">Log in to access your TeamTalk workspace.</p>
 
         <form onSubmit={(e) => { e.preventDefault(); handleLogin(e); }} noValidate>
-          {error   && <div className="alert error">{error}</div>}
+          {error && (
+          <div className="alert error" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            {error}
+          </div>
+        )}
           {success && <div className="alert success">{success}</div>}
 
           <div className="field">
