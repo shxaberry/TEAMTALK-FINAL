@@ -71,7 +71,6 @@ const CreateModal = ({
                         />
                     </div>
 
-
                     <div>
                         <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3"> Avatar Color</label>
                         <div className="flex items-center gap-3">
