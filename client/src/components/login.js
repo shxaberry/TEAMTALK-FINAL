@@ -13,13 +13,12 @@ const Login = ({ setAuth, switchToSignup }) => {
   const [loading, setLoading]           = useState(false);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  setError('');
+  setSuccess('');
 
-    if (!email || !password) {
-      return setError('Please fill in all fields.');
-    }
+  if (!email || !password) {
+    return setError('Please fill in all fields.');
+  }
 
     setLoading(true);
 
@@ -60,7 +59,7 @@ const Login = ({ setAuth, switchToSignup }) => {
         <h1>Welcome back</h1>
         <p className="subtext">Log in to access your TeamTalk workspace.</p>
 
-        <form onSubmit={handleLogin} noValidate>
+        <form onSubmit={(e) => { e.preventDefault(); handleLogin(e); }} noValidate>
           {error   && <div className="alert error">{error}</div>}
           {success && <div className="alert success">{success}</div>}
 

@@ -957,7 +957,7 @@ function App() {
                                   key={opt.id}
                                   onClick={() => !expired && handleVote(opt.id)}
                                   disabled={expired}
-                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden ${expired ? 'border-gray-100 cursor-not-allowed' : 'border-gray-100 hover:border-brand-200 cursor-pointer'}`}
+                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden ${expired ? 'border-gray-100 cursor-not-allowed' : 'border-gray-100 hover:border-brand-400 hover:shadow-md hover:scale-[1.02] cursor-pointer'}`}
                                 >
                                   <div
                                     className={`absolute inset-0 transition-all duration-700 rounded-xl ${expired ? 'bg-gray-100' : 'bg-brand-50'}`}
@@ -1121,8 +1121,8 @@ function App() {
 
       {/* POLL MODAL */}
       {isPollModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-sm px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 mx-auto">
             <h3 className="text-lg font-extrabold text-gray-800 mb-6">Create a Poll</h3>
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Question</label>
             <input
