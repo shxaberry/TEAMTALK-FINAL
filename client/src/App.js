@@ -1043,7 +1043,6 @@ function App() {
                   </div>
                 )}
 
-                {/* ── SUMMARY ── ✅ FIX: renders bullet points from Gemini properly */}
                 {activeTab === 'summary' && (
                   <div className="space-y-6">
                     <div className="bg-gradient-to-br from-brand-500 to-indigo-600 p-6 rounded-3xl text-white shadow-xl shadow-brand-500/20">
@@ -1059,7 +1058,7 @@ function App() {
                           <div className={isSummarizing ? 'animate-spin' : ''}><Icon.RefreshCw /></div>
                         </button>
                       </div>
-                      {/* ✅ FIX: render each bullet on its own line */}
+
                       {summaryData.aiSummary
                         ? summaryData.aiSummary.split('\n').filter(l => l.trim()).map((line, i) => (
                             <p key={i} className="text-sm font-medium leading-relaxed text-indigo-100 mb-1">{line}</p>
