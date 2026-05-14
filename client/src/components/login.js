@@ -3,7 +3,7 @@ import axios from 'axios';
 import './login.css';
 
 // ── Single source of truth for the backend URL ────────────────────────────────
-const API = 'http://localhost:5000';
+const API = 'https://adorable-peace-production-50ae.up.railway.app';
 const Login = ({ setAuth, switchToSignup }) => {
   const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
@@ -13,13 +13,12 @@ const Login = ({ setAuth, switchToSignup }) => {
   const [loading, setLoading]           = useState(false);
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
+  setError('');
+  setSuccess('');
 
-    if (!email || !password) {
-      return setError('Please fill in all fields.');
-    }
+  if (!email || !password) {
+    return setError('Please fill in all fields.');
+  }
 
     setLoading(true);
 
@@ -60,7 +59,7 @@ const Login = ({ setAuth, switchToSignup }) => {
         <h1>Welcome back</h1>
         <p className="subtext">Log in to access your TeamTalk workspace.</p>
 
-        <form onSubmit={handleLogin} noValidate>
+        <form onSubmit={(e) => { e.preventDefault(); handleLogin(e); }} noValidate>
           {error   && <div className="alert error">{error}</div>}
           {success && <div className="alert success">{success}</div>}
 

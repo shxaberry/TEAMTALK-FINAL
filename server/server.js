@@ -10,11 +10,11 @@ const multer    = require('multer');
 const fs        = require('fs');
 const bcrypt    = require('bcrypt');
 const jwt       = require('jsonwebtoken');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SECRET_KEY = process.env.SECRET_KEY || 'fallback_local_secret';
-const BASE_URL   = process.env.BASE_URL   || 'http://localhost:5000';
+const BASE_URL   = process.env.BASE_URL   || 'https://adorable-peace-production-50ae.up.railway.app';
 const PORT       = process.env.PORT       || 5000;
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -22,14 +22,19 @@ const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.webm')) res.setHeader('Content-Type', 'audio/webm');
+    if (filePath.endsWith('.ogg'))  res.setHeader('Content-Type', 'audio/ogg');
+    if (filePath.endsWith('.mp3'))  res.setHeader('Content-Type', 'audio/mpeg');
+  }
+}));
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-// ── Gemini AI ─────────────────────────────────────────────────────────────────
-const genAI       = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+// ── Groq AI ───────────────────────────────────────────────────────────────────
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // ── Database ──────────────────────────────────────────────────────────────────
 let db = null;
@@ -360,9 +365,25 @@ app.get('/api/polls/:code', requireAuth, requireDB, async (req, res) => {
         [p.id]
       );
       p.options = opts;
+      // Safely normalize ends_at — MySQL2 may return Date object or string
+      if (p.ends_at) {
+        try {
+          let ms;
+          if (p.ends_at instanceof Date) {
+            ms = p.ends_at.getTime();
+          } else {
+            const s = String(p.ends_at).trim();
+            // MySQL DATETIME string "2026-05-13 11:51:09" — no timezone, treat as local
+            ms = new Date(s.replace(' ', 'T')).getTime();
+          }
+          p.ends_at = isNaN(ms) ? null : new Date(ms).toISOString();
+        } catch(e) {
+          p.ends_at = null;
+        }
+      }
     }
     res.json(polls);
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { console.error('GET /api/polls error:', err); res.status(500).json({ message: err.message }); }
 });
 
 //  FIX: removed endsAt requirement — poll launches without duration too
@@ -373,7 +394,7 @@ app.post('/api/polls', requireAuth, requireDB, async (req, res) => {
   try {
     const [result] = await db.query(
       'INSERT INTO polls (room_code, question, ends_at) VALUES (?, ?, ?)',
-      [roomCode, question, endsAt ? new Date(endsAt).toISOString().slice(0, 19).replace('T', ' ') : null]
+      [roomCode, question, endsAt ? new Date(endsAt).toISOString().slice(0,19).replace('T',' ') : null]
     );
     for (const opt of options) {
       await db.query(
@@ -448,7 +469,7 @@ app.get('/api/summary/:code', requireAuth, requireDB, async (req, res) => {
     try {
       if (msgs.length > 0 || polls.length > 0) {
 
-        // Build a numbered activity log for Gemini
+        // Build a numbered activity log for Claude
         let activityLines = [];
         let counter = 1;
 
@@ -471,23 +492,24 @@ app.get('/api/summary/:code', requireAuth, requireDB, async (req, res) => {
           counter++;
         });
 
-        const prompt = `
-You are summarizing a team collaboration session. Below is a numbered activity log.
-Write a clean bullet-point summary where each bullet covers what happened.
-Keep it concise, factual, and human-friendly.
-Format: "• [Person] did/said [action/content]"
-Do NOT repeat the raw log. Summarize meaningfully.
+        const prompt = `You are a chat summarizer like a smart assistant in Messenger or Slack.
 
-Activity log:
+A team was chatting in a room. Here is the full activity log:
 ${activityLines.join('\n')}
 
-Write the summary now:`;
+Write a friendly, natural 3-5 sentence paragraph that catches someone up on what they missed.
+Cover: what topics were discussed, any media or files shared, and poll results if any.
+Be conversational and concise. Do NOT list every message one by one. Summarize the overall session.`;
 
-        const result = await geminiModel.generateContent(prompt);
-        aiSummary = result.response.text();
+        const result = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: prompt }]
+        });
+        aiSummary = result.choices[0]?.message?.content || 'Summary unavailable.';
       }
     } catch (aiErr) {
-      console.warn('Gemini error (non-fatal):', aiErr.message);
+      console.warn('AI summary error (non-fatal):', aiErr.message);
       aiSummary = 'AI summary temporarily unavailable.';
     }
 

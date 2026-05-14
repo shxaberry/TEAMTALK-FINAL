@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/login';
 import Signup from './components/signup';
 
-const API = 'http://localhost:5000';
+const API = 'https://adorable-peace-production-50ae.up.railway.app';
 
 let socket = null;
 function getSocket() {
@@ -128,37 +128,42 @@ const Icon = {
 // ═══════════════════════════════════════════════════════════
 //  POLL COUNTDOWN
 // ═══════════════════════════════════════════════════════════
+function normalizeEndsAt(raw) {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  // If it has Z or +offset it's UTC — parse directly
+  if (s.endsWith('Z') || s.includes('+')) return new Date(s).getTime();
+  // MySQL DATETIME string like "2026-05-13 11:51:09" — treat as LOCAL time
+  return new Date(s.replace(' ', 'T')).getTime();
+}
+
 function PollCountdown({ endsAt }) {
   const [timeLeft, setTimeLeft] = useState('');
   const [expired, setExpired]   = useState(false);
 
   useEffect(() => {
-    if (!endsAt) return;
-    // Normalize: MySQL returns "2026-05-13 10:30:00" (no Z), ISO strings already have Z
-    const raw = String(endsAt);
-    const normalized = raw.includes('T') && raw.endsWith('Z')
-      ? raw                                    // already ISO UTC e.g. "2026-05-13T10:30:00.000Z"
-      : raw.replace(' ', 'T') + 'Z';           // MySQL datetime → treat as UTC
+    const endMs = normalizeEndsAt(endsAt);
+    if (!endMs || isNaN(endMs)) return;
 
-    const endMs = new Date(normalized).getTime();
-
+    let id;  // declare before tick so clearInterval(id) works
     const tick = () => {
       const diff = endMs - Date.now();
-      if (diff <= 0) { setExpired(true); setTimeLeft('Ended'); return; }
+      if (diff <= 0) { setExpired(true); setTimeLeft('Ended'); clearInterval(id); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
       setTimeLeft(h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`);
     };
     tick();
-    const id = setInterval(tick, 1000);
+    id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [endsAt]);
 
   if (!endsAt) return null;
   return (
     <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${expired ? 'bg-gray-100 text-gray-400' : 'bg-amber-50 text-amber-600'}`}>
-      <Icon.Clock /> {timeLeft}
+      <Icon.Clock /> {expired ? 'Ended' : timeLeft || '...'}
     </div>
   );
 }
@@ -189,6 +194,92 @@ function ErrorNotification({ message, onClose }) {
       <Icon.AlertCircle />
       <div className="flex-1"><p className="text-sm font-bold text-red-800">{message}</p></div>
       <button onClick={onClose} className="text-red-400 hover:text-red-600 transition shrink-0"><Icon.X /></button>
+    </div>
+  );
+}
+
+function DeleteConfirmModal({ roomTitle, onConfirm, onCancel }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirm = async () => {
+    setIsDeleting(true);
+    await onConfirm();
+    setIsDeleting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 flex flex-col items-center text-center gap-5">
+        <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center">
+          <svg className="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <div>
+          <p className="text-lg font-extrabold text-gray-800 mb-1.5">Delete project?</p>
+          <p className="text-sm text-gray-500 leading-relaxed">
+            <span className="font-bold text-gray-700">{roomTitle}</span> and all its messages, polls, and files will be permanently removed. This can't be undone.
+          </p>
+        </div>
+        <div className="flex gap-3 w-full mt-1">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={isDeleting}
+            className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 transition disabled:opacity-60"
+          >
+            {isDeleting ? 'Deleting…' : 'Delete project'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RenameModal({ initialTitle, onConfirm, onCancel }) {
+  const [title, setTitle] = useState(initialTitle);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-md px-4">
+      <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-sm p-8 animate-in fade-in zoom-in duration-300">
+        <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-6">
+          <svg className="w-8 h-8 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+        </div>
+        
+        <h3 className="text-xl font-black text-gray-900 mb-2">Rename Project</h3>
+        <p className="text-sm text-gray-500 mb-6">Give your workspace a clear and descriptive name.</p>
+
+        <input 
+          autoFocus
+          className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all mb-8"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onConfirm(title)}
+          placeholder="Project name..."
+        />
+
+        <div className="flex gap-3 w-full">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(title)}
+            className="flex-1 py-4 rounded-2xl bg-brand-500 text-white text-sm font-black hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20"
+          >
+            Save Changes
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -250,6 +341,9 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(true);
   const [errorMessage, setErrorMessage]     = useState('');
 
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title }
+  const [renameTarget, setRenameTarget] = useState(null); // { id, title }
+
   const socketRef  = useRef(null);
   const chatEndRef  = useRef(null);
   const fileInputRef = useRef(null);
@@ -257,6 +351,7 @@ function App() {
   const sock = () => {
     if (!socketRef.current || !socketRef.current.connected) socketRef.current = getSocket();
     return socketRef.current;
+
   };
 
   // ── Auth init ─────────────────────────────────────────────
@@ -269,7 +364,27 @@ function App() {
         setDisplayName(res.data.username || localStorage.getItem('userName') || '');
         setAvatarColor(res.data.color   || localStorage.getItem('userColor') || '#6366f1');
         socketRef.current = getSocket();
-        setView('dashboard');
+
+        // 👇 restore room if user was inside one before refresh
+        const savedRoom = localStorage.getItem('activeRoom');
+        if (savedRoom) {
+          try {
+            const room = JSON.parse(savedRoom);
+            setActiveRoom(room);
+            setView('dashboard');
+            const s = getSocket();
+            s.emit('join_room', room.roomCode);
+            fetchChatHistory(room.roomCode);
+            fetchPolls(room.roomCode);
+            fetchSummary(room.roomCode);
+            fetchCanvas(room.roomCode);
+          } catch {
+            localStorage.removeItem('activeRoom');
+            setView('dashboard');
+          }
+        } else {
+          setView('dashboard');
+        }
       })
       .catch(() => {
         localStorage.removeItem('token');
@@ -372,8 +487,8 @@ function App() {
     if (!code) return;
     const normalizedRoom = { ...room, roomCode: code };
     setActiveRoom(normalizedRoom);
+    localStorage.setItem('activeRoom', JSON.stringify(normalizedRoom)); // 👈 save it
     sock().emit('join_room', code);
-    //  FIX: visit increments properly now
     axios.patch(`${API}/api/rooms/${code}/visit`).catch(console.error);
     fetchCanvas(code); fetchChatHistory(code); fetchPolls(code); fetchSummary(code);
   };
@@ -400,16 +515,38 @@ function App() {
   };
 
   const handleDeleteRoom = async (roomId) => {
-    if (!window.confirm('Delete this project permanently?')) return;
-    try { await axios.delete(`${API}/api/rooms/${roomId}`); fetchRooms(); }
-    catch { setErrorMessage('Could not delete the room.'); }
+    const room = rooms.find(r => r.id === roomId);
+    setDeleteTarget({ id: roomId, title: room?.title || 'this project' });
   };
 
-  const handleRenameRoom = async (roomId, currentTitle) => {
-    const newTitle = window.prompt('Enter new project name:', currentTitle);
-    if (newTitle?.trim() && newTitle !== currentTitle) {
-      try { await axios.put(`${API}/api/rooms/${roomId}`, { title: newTitle }); fetchRooms(); }
-      catch { setErrorMessage('Could not rename the room.'); }
+  const confirmDeleteRoom = async () => {
+    try {
+      await axios.delete(`${API}/api/rooms/${deleteTarget.id}`);
+      fetchRooms();
+    } catch {
+      setErrorMessage('Could not delete the room.');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  const handleRenameRoom = (roomId, currentTitle) => {
+    setRenameTarget({ id: roomId, title: currentTitle });
+  };
+
+  const confirmRenameRoom = async (newTitle) => {
+    if (!newTitle?.trim() || newTitle === renameTarget.title) {
+      setRenameTarget(null);
+      return;
+    }
+
+    try {
+      await axios.put(`${API}/api/rooms/${renameTarget.id}`, { title: newTitle });
+      fetchRooms();
+    } catch {
+      setErrorMessage('Could not rename the room.');
+    } finally {
+      setRenameTarget(null);
     }
   };
 
@@ -498,56 +635,69 @@ function App() {
     } catch { setErrorMessage('Failed to upload file. Please try again.'); }
   };
 
- const startRecording = async () => {
+  const chunksRef = useRef([]);
+
+  const toggleRecording = async () => {
+    // If already recording — stop it
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    // Start recording
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setErrorMessage('Microphone not supported in this browser.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus' // Tell it exactly what format to use
-      });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/ogg';
 
-      const chunks = [];
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType });
 
-      // This part captures the audio pieces
-      mediaRecorderRef.current.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          chunks.push(e.data);
-        }
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        // Combine all pieces into one final file
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        
-        // If the file is basically empty (less than 1kb), don't send it
-        if (blob.size < 100) {
-          setErrorMessage("Recording was too short or failed to capture audio.");
-          return;
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        if (blob.size > 0) {
+          handleUpload(new File([blob], 'voice-note.webm', { type: mimeType }), 'voice');
         }
-
-        const audioFile = new File([blob], `voice-${Date.now()}.webm`, { type: 'audio/webm' });
-        handleUpload(audioFile, 'voice');
-        
-        // Stop the microphone light from staying on
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach(t => t.stop());
+        chunksRef.current = [];
       };
 
-      mediaRecorderRef.current.onerror = () => setErrorMessage('Microphone error.');
+      recorder.onerror = (e) => {
+        console.error('MediaRecorder error:', e);
+        setErrorMessage('Recording error. Please try again.');
+        setIsRecording(false);
+      };
 
-      mediaRecorderRef.current.start(1000); 
-      
+      recorder.start(100); // collect data every 100ms
+      mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) {
-      console.error("Mic Error:", err);
-      setErrorMessage('Microphone access denied or not found.');
+      console.error('Microphone error:', err.name, err.message);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        setErrorMessage('Microphone blocked by system. Go to Windows Settings → Privacy → Microphone → allow Chrome.');
+      } else if (err.name === 'NotFoundError') {
+        setErrorMessage('No microphone detected. Please connect one and try again.');
+      } else {
+        setErrorMessage('Microphone error: ' + err.name + ' — ' + err.message);
+      }
     }
   };
 
- const stopRecording = () => {
-  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-    mediaRecorderRef.current.stop();
-    setIsRecording(false);
-  }
-};
+
 
   // ── Polls ─────────────────────────────────────────────────
   const handleVote = async (optionId) => {
@@ -596,9 +746,11 @@ function App() {
   const isPollExpired = (poll) => {
     const raw = poll.ends_at || poll.endsAt;
     if (!raw) return false;
-    const s = String(raw);
-    const normalized = s.includes('T') && s.endsWith('Z') ? s : s.replace(' ', 'T') + 'Z';
-    return new Date(normalized).getTime() < Date.now();
+    const s = String(raw).trim();
+    const endMs = (s.endsWith('Z') || s.includes('+'))
+      ? new Date(s).getTime()
+      : new Date(s.replace(' ', 'T') + 'Z').getTime();
+    return !isNaN(endMs) && endMs < Date.now();
   };
 
   // ── Helper: get fileUrl from either camelCase or snake_case ─────────────────
@@ -630,7 +782,13 @@ function App() {
       <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => { setActiveRoom(null); setChatLog([]); setPolls([]); fetchRooms(); }}
+            onClick={() => { 
+              setActiveRoom(null); 
+              setChatLog([]); 
+              setPolls([]); 
+              localStorage.removeItem('activeRoom'); // 👈 clear it
+              fetchRooms(); 
+            }}
             className="w-10 h-10 flex items-center justify-center bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition"
           >
             <Icon.ArrowLeft />
@@ -761,43 +919,24 @@ function App() {
                                   onClick={() => {
                                     const audioEl = document.getElementById(`audio-${i}`);
                                     if (!audioEl) return;
-
-                                    if (playingId === i) {
-                                      audioEl.pause();
-                                      setPlayingId(null);
-                                    } else {
-                                      // If a different audio was playing, stop it first
-                                      if (playingId !== null) {
-                                        const oldAudio = document.getElementById(`audio-${playingId}`);
-                                        if (oldAudio) oldAudio.pause();
-                                      }
-
-                                      // Play the new audio
-                                      audioEl.play()
-                                        .then(() => setPlayingId(i))
-                                        .catch((err) => {
-                                          console.error("Playback failed:", err);
-                                          setPlayingId(null);
-                                        });
-
-                                      audioEl.onended = () => setPlayingId(null);
+                                    if (playingId === i) { audioEl.pause(); setPlayingId(null); }
+                                    else {
+                                      // Reload src to ensure fresh load before playing
+                                      audioEl.load();
+                                      audioEl.play().then(() => {
+                                        setPlayingId(i);
+                                        audioEl.onended = () => setPlayingId(null);
+                                      }).catch((e) => {
+                                        console.error('Audio play error:', e);
+                                        setPlayingId(null);
+                                      });
                                     }
                                   }}
                                   className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-white shrink-0 hover:bg-white/30 transition-all"
                                 >
                                   {playingId === i ? <Icon.Pause /> : <Icon.Play />}
                                 </button>
-                                
-                                {/* The Audio Tag - We add preload and crossOrigin */}
-                                {getFileUrl(msg) && (
-                                  <audio 
-                                    id={`audio-${i}`} 
-                                    src={getFileUrl(msg)} 
-                                    preload="auto"
-                                    className="hidden"
-                                  />
-                                )}
-
+                                {getFileUrl(msg) && <audio id={`audio-${i}`} src={getFileUrl(msg)} preload="auto" />}
                                 <div className="flex items-end gap-1 h-7 flex-1">
                                   {Array.from({ length: 14 }, (_, v) => (
                                     <div
@@ -877,7 +1016,7 @@ function App() {
                                   key={opt.id}
                                   onClick={() => !expired && handleVote(opt.id)}
                                   disabled={expired}
-                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden ${expired ? 'border-gray-100 cursor-not-allowed' : 'border-gray-100 hover:border-brand-200 cursor-pointer'}`}
+                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden ${expired ? 'border-gray-100 cursor-not-allowed' : 'border-gray-100 hover:border-brand-400 hover:shadow-md hover:scale-[1.02] cursor-pointer'}`}
                                 >
                                   <div
                                     className={`absolute inset-0 transition-all duration-700 rounded-xl ${expired ? 'bg-gray-100' : 'bg-brand-50'}`}
@@ -996,26 +1135,20 @@ function App() {
                       <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleUpload(e)} />
                     </label>
                     <input
-  type="text"
-  className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
-  placeholder={isRecording ? "Recording audio..." : (replyTo ? `Reply to ${replyTo.user}...` : 'Message team...')}
-  value={message}
-  disabled={isRecording} // Optional: prevent typing while recording
-  onChange={e => setMessage(e.target.value)}
-  onKeyDown={e => e.key === 'Enter' && sendMessage()}
-/>
+                      type="text"
+                      className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
+                      placeholder={replyTo ? `Reply to ${replyTo.user}...` : 'Message team...'}
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                    />
                     <button
-  onClick={() => isRecording ? stopRecording() : startRecording()}
-  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-    isRecording 
-      ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' 
-      : 'bg-white text-gray-400 shadow-sm hover:text-brand-500 hover:bg-brand-50'
-  }`}
-  title={isRecording ? "Click to stop recording" : "Click to start recording"}
->
-  {/* Optional: You can change the icon to an 'X' or 'Stop' icon when recording */}
-  {isRecording ? <Icon.X /> : <Icon.Mic />}
-</button>
+                      onClick={toggleRecording}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'bg-white text-gray-400 shadow-sm hover:text-brand-500'}`}
+                      title="Hold to record voice"
+                    >
+                      <Icon.Mic />
+                    </button>
                     <button onClick={sendMessage} className="w-10 h-10 bg-brand-500 text-white rounded-xl shadow-lg shadow-brand-500/30 flex items-center justify-center hover:bg-brand-600 transition">
                       <Icon.Send />
                     </button>
@@ -1047,8 +1180,8 @@ function App() {
 
       {/* POLL MODAL */}
       {isPollModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-sm px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 mx-auto">
             <h3 className="text-lg font-extrabold text-gray-800 mb-6">Create a Poll</h3>
             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 block">Question</label>
             <input
@@ -1126,7 +1259,7 @@ function App() {
   );
 
   // ── Dashboard view ────────────────────────────────────────
-  return (
+return (
     <>
       <Dashboard
         rooms={rooms} displayName={displayName}
@@ -1150,6 +1283,21 @@ function App() {
         avatarColor={avatarColor} setAvatarColor={setAvatarColor}
         handleJoin={handleJoinRoom}
       />
+      {deleteTarget && (
+        <DeleteConfirmModal
+          roomTitle={deleteTarget.title}
+          onConfirm={confirmDeleteRoom}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
+
+      {renameTarget && (
+        <RenameModal
+          initialTitle={renameTarget.title}
+          onConfirm={confirmRenameRoom}
+          onCancel={() => setRenameTarget(null)}
+        />
+      )}
     </>
   );
 }
