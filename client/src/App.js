@@ -588,21 +588,76 @@ function App() {
   };
 
   // ── Canvas ────────────────────────────────────────────────
+  // 1. Remove Function
+  const handleRemoveElement = async (id) => {
+    try {
+      await axios.delete(`${API}/api/canvas/${id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setCanvasElements(prev => prev.filter(el => el.id !== id));
+      sock().emit('element_removed', { id, roomCode: activeRoom.roomCode });
+    } catch (err) {
+      setErrorMessage('Failed to remove image.');
+    }
+  };
+
+  // 2. Zoom Function
+  const handleZoom = async (id, delta) => {
+    setCanvasElements(prev => prev.map(el => {
+      if (el.id === id) {
+        const newWidth = Math.max(50, (el.width || 160) + delta);
+        const updated = { ...el, width: newWidth };
+        
+        // Update server
+        axios.put(`${API}/api/canvas/${id}`, updated, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        
+        return updated;
+      }
+      return el;
+    }));
+  };
+
+  // 3. Updated Drop Handler (Handles both NEW and MOVING)
   const handleDropOnCanvas = async (e) => {
     e.preventDefault();
     const raw = e.dataTransfer.getData('itemData');
     if (!raw) return;
+    
     let data;
     try { data = JSON.parse(raw); } catch { return; }
+
     const rect = e.currentTarget.getBoundingClientRect();
-    const x    = Math.round(e.clientX - rect.left - 80);
-    const y    = Math.round(e.clientY - rect.top  - 40);
-    const newEl = { roomCode: activeRoom.roomCode, url: data.url, x, y };
-    try {
-      await axios.post(`${API}/api/canvas`, newEl);
-      sock().emit('element_added', newEl);
-      setCanvasElements(prev => [...prev, newEl]);
-    } catch { setErrorMessage('Failed to add image to canvas.'); }
+    const x = Math.round(e.clientX - rect.left - 80);
+    const y = Math.round(e.clientY - rect.top - 40);
+
+    const config = {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    };
+
+    if (data.id) {
+      // MOVE
+      const updated = { ...data, x, y };
+      try {
+        setCanvasElements(prev => prev.map(el => el.id === data.id ? updated : el)); // Update UI first (Optimistic)
+        await axios.put(`${API}/api/canvas/${data.id}`, updated, config);
+      } catch { 
+        setErrorMessage('Failed to move image.');
+        fetchCanvas(activeRoom.roomCode); // Reload from server if failed
+      }
+    } else {
+      // NEW
+      try {
+        const newEl = { roomCode: activeRoom.roomCode, url: data.url, x, y, width: 160 };
+        const res = await axios.post(`${API}/api/canvas`, newEl, config);
+        if (res.data.id) {
+          const saved = { ...newEl, id: res.data.id };
+          setCanvasElements(prev => [...prev, saved]);
+          sock().emit('element_added', saved);
+        }
+      } catch { setErrorMessage('Failed to add image.'); }
+    }
   };
 
   // ── Chat ──────────────────────────────────────────────────
@@ -827,27 +882,43 @@ function App() {
         </div>
       </header>
 
+      {/* CANVAS */}
       <div className="flex-1 flex overflow-hidden">
-        {/* CANVAS */}
-        <div
-          className="flex-1 h-full bg-white relative overflow-hidden cursor-crosshair"
-          style={{
-            backgroundImage:    activeRoom.bgImage ? `url(${activeRoom.bgImage})` : 'radial-gradient(#e2e8f0 1.5px, transparent 0)',
-            backgroundSize:     activeRoom.bgImage ? 'cover' : '24px 24px',
-            backgroundPosition: 'center',
-          }}
-          onDragOver={e => e.preventDefault()}
-          onDrop={handleDropOnCanvas}
-        >
-          {canvasElements.map((el, idx) => (
-            <div key={el.id || idx} className="absolute p-2 bg-white shadow-xl border border-gray-100 rounded-xl" style={{ left: el.x, top: el.y }}>
-              <img
-                src={el.url} alt="" className="w-40 rounded-lg pointer-events-none"
-                draggable onDragStart={(e) => e.dataTransfer.setData('itemData', JSON.stringify({ url: el.url, name: 'canvas-image' }))}
-              />
+      <div
+        className="flex-1 h-full bg-white relative overflow-hidden cursor-crosshair"
+        style={{
+          backgroundImage: activeRoom.bgImage ? `url(${activeRoom.bgImage})` : 'radial-gradient(#e2e8f0 1.5px, transparent 0)',
+          backgroundSize: activeRoom.bgImage ? 'cover' : '24px 24px',
+        }}
+        onDragOver={e => e.preventDefault()}
+        onDrop={handleDropOnCanvas}
+      >
+        {canvasElements.map((el) => (
+          <div
+            key={el.id}
+            className="absolute p-1 bg-white shadow-xl border border-gray-200 rounded-lg group"
+            style={{ left: el.x, top: el.y, width: el.width || 160 }}
+          >
+            {/* TOOLBAR (Visible on Hover) */}
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-1 bg-gray-800 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-20">
+              <button onClick={() => handleZoom(el.id, 40)} className="px-2 hover:bg-gray-600 rounded">+</button>
+              <button onClick={() => handleZoom(el.id, -40)} className="px-2 hover:bg-gray-600 rounded">-</button>
+              <button onClick={() => handleRemoveElement(el.id)} className="px-2 hover:bg-red-600 rounded text-red-400">×</button>
             </div>
-          ))}
-        </div>
+
+            <img
+              src={el.url}
+              alt=""
+              className="w-full h-auto rounded pointer-events-auto cursor-move"
+              draggable
+              onDragStart={(e) => {
+                // Include the ID so handleDrop knows we are MOVING, not creating new
+                e.dataTransfer.setData('itemData', JSON.stringify(el));
+              }}
+            />
+          </div>
+        ))}
+      </div>
 
         {/* SIDEBAR */}
         <aside className={`bg-white border-l border-gray-100 flex flex-col h-full transition-all duration-500 ease-in-out relative shadow-2xl z-30 ${isSidebarOpen ? 'w-[420px]' : 'w-20'}`}>

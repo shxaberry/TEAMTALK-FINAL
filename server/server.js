@@ -423,6 +423,7 @@ app.post('/api/polls/vote', requireAuth, requireDB, async (req, res) => {
 //  CANVAS
 // ══════════════════════════════════════════════════════════════════════════════
 
+// GET Canvas Elements
 app.get('/api/canvas/:code', requireAuth, requireDB, async (req, res) => {
   try {
     const [rows] = await db.query(
@@ -432,16 +433,41 @@ app.get('/api/canvas/:code', requireAuth, requireDB, async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// ADD New Canvas Element
 app.post('/api/canvas', requireAuth, requireDB, async (req, res) => {
-  const { roomCode, url, x, y } = req.body;
+  const { roomCode, url, x, y, width } = req.body; // Added width
   if (!roomCode || !url) return res.status(400).json({ message: 'roomCode and url are required.' });
+  
   try {
-    await db.query(
-      'INSERT INTO canvas_elements (room_code, url, x, y) VALUES (?, ?, ?, ?)',
-      [roomCode, url, x || 0, y || 0]
+    // We capture the "result" to get the insertId
+    const [result] = await db.query(
+      'INSERT INTO canvas_elements (room_code, url, x, y, width) VALUES (?, ?, ?, ?, ?)',
+      [roomCode, url, x || 0, y || 0, width || 160]
     );
-    res.json({ success: true });
+    
+    // Return the ID so the frontend can use it immediately for Delete/Zoom/Move
+    res.json({ success: true, id: result.insertId }); 
   } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// UPDATE element (Position or Zoom)
+app.put('/api/canvas/:id', requireAuth, requireDB, async (req, res) => {
+    const { x, y, width } = req.body;
+    try {
+        await db.execute(
+            'UPDATE canvas_elements SET x = ?, y = ?, width = ? WHERE id = ?',
+            [x, y, width, req.params.id]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// DELETE element
+app.delete('/api/canvas/:id', requireAuth, requireDB, async (req, res) => {
+    try {
+        await db.execute('DELETE FROM canvas_elements WHERE id = ?', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
