@@ -429,29 +429,15 @@ function App() {
       });
     };
     const handlePollUpdate = () => { fetchPolls(code); fetchSummary(code); };
-    const handleElement = (el) => setCanvasElements(prev => {
-  // Prevent duplicate if we already have this id
-    if (el.id && prev.some(e => e.id === el.id)) return prev;
-    return [...prev, el];
-  });
-  const handleElementUpdated = (data) => setCanvasElements(prev =>
-    prev.map(el => el.id === data.id ? { ...el, x: data.x, y: data.y, width: data.width } : el)
-  );
-  const handleElementDeleted = (data) => setCanvasElements(prev =>
-    prev.filter(el => el.id !== data.id)
-  );
+    const handleElement    = (el) => setCanvasElements(prev => [...prev, el]);
 
-    s.on('receive_message',   handleMessage);
-    s.on('poll_updated',      handlePollUpdate);
-    s.on('element_received',  handleElement);
-    s.on('element_updated',   handleElementUpdated);
-    s.on('element_deleted',   handleElementDeleted);
+    s.on('receive_message',  handleMessage);
+    s.on('poll_updated',     handlePollUpdate);
+    s.on('element_received', handleElement);
     return () => {
       s.off('receive_message',  handleMessage);
       s.off('poll_updated',     handlePollUpdate);
       s.off('element_received', handleElement);
-      s.off('element_updated',  handleElementUpdated);
-      s.off('element_deleted',  handleElementDeleted);
     };
   }, [activeRoom]);
 
@@ -602,80 +588,22 @@ function App() {
   };
 
   // ── Canvas ────────────────────────────────────────────────
-// 1. Remove Function
-  const handleRemoveElement = async (id) => {
-  if (!id) {
-    setErrorMessage("This item hasn't been saved yet. Try again in a second.");
-    return;
-  }
-  // Remove from UI immediately (optimistic)
-  setCanvasElements(prev => prev.filter(el => el.id !== id));
-  sock().emit('element_removed', { id, roomCode: activeRoom.roomCode });
-  try {
-    await axios.delete(`${API}/api/canvas/${id}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-  } catch (err) {
-    console.error('Delete error:', err.response?.status, err.response?.data);
-    fetchCanvas(activeRoom.roomCode);
-    setErrorMessage(`Delete failed: ${err.response?.status} — ${err.response?.data?.message || err.message}`);
-  }
-};
-
-  // 2. Zoom Function
-  const handleZoom = async (id, delta) => {
-    if (!id) return;
-    setCanvasElements(prev => {
-      const el = prev.find(e => e.id === id);
-      if (!el) return prev;
-      const newWidth = Math.max(50, (el.width || 160) + delta);
-      const updated = { ...el, width: newWidth };
-      // Broadcast to others
-      sock().emit('element_zoomed', { id, roomCode: activeRoom.roomCode, width: newWidth, x: el.x, y: el.y });
-      // Save to DB
-      axios.put(`${API}/api/canvas/${id}`, { x: el.x, y: el.y, width: newWidth })
-        .catch(() => setErrorMessage("Zoom not saved"));
-      return prev.map(e => e.id === id ? updated : e);
-    });
+  const handleDropOnCanvas = async (e) => {
+    e.preventDefault();
+    const raw = e.dataTransfer.getData('itemData');
+    if (!raw) return;
+    let data;
+    try { data = JSON.parse(raw); } catch { return; }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x    = Math.round(e.clientX - rect.left - 80);
+    const y    = Math.round(e.clientY - rect.top  - 40);
+    const newEl = { roomCode: activeRoom.roomCode, url: data.url, x, y };
+    try {
+      await axios.post(`${API}/api/canvas`, newEl);
+      sock().emit('element_added', newEl);
+      setCanvasElements(prev => [...prev, newEl]);
+    } catch { setErrorMessage('Failed to add image to canvas.'); }
   };
-
-   // 3. Optimized Drop Handler
-const handleDropOnCanvas = async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  const raw = e.dataTransfer.getData('itemData');
-  if (!raw) return;
-  let data;
-  try { data = JSON.parse(raw); } catch { return; }
-  if (!data?.url) return;
-
-  const rect = e.currentTarget.getBoundingClientRect();
-  const x = Math.round(e.clientX - rect.left - 80);
-  const y = Math.round(e.clientY - rect.top - 40);
-
-  if (data.id) {
-    // --- CASE: MOVING EXISTING ---
-    const updated = { ...data, x, y };
-    setCanvasElements(prev => prev.map(el => el.id === data.id ? updated : el));
-    sock().emit('element_moved', { id: data.id, roomCode: activeRoom.roomCode, x, y, width: data.width || 160 });
-    try {
-      await axios.put(`${API}/api/canvas/${data.id}`, { x, y, width: data.width || 160 });
-    } catch (err) {
-      setErrorMessage("Failed to save new position.");
-    }
-  } else {
-    // --- CASE: ADDING NEW ---
-    const newEl = { roomCode: activeRoom.roomCode, url: data.url, x, y, width: 160 };
-    try {
-      const res = await axios.post(`${API}/api/canvas`, newEl);
-      const savedWithId = { ...newEl, id: res.data.id };
-      setCanvasElements(prev => [...prev, savedWithId]);
-      sock().emit('element_added', savedWithId);
-    } catch (err) {
-      setErrorMessage("Failed to add image to canvas.");
-    }
-  }
-};
 
   // ── Chat ──────────────────────────────────────────────────
   const sendMessage = () => {
@@ -784,6 +712,8 @@ const handleDropOnCanvas = async (e) => {
       }
     }
   };
+
+
 
   // ── Polls ─────────────────────────────────────────────────
   const handleVote = async (optionId) => {
@@ -897,52 +827,27 @@ const handleDropOnCanvas = async (e) => {
         </div>
       </header>
 
-      {/* CANVAS */}
       <div className="flex-1 flex overflow-hidden">
-      <div
-        className="flex-1 h-full bg-white relative overflow-hidden cursor-crosshair"
-        style={{
-          backgroundImage: activeRoom.bgImage ? `url(${activeRoom.bgImage})` : 'radial-gradient(#e2e8f0 1.5px, transparent 0)',
-          backgroundSize: activeRoom.bgImage ? 'cover' : '24px 24px',
-        }}
-        onDragOver={e => e.preventDefault()}
-        onDrop={handleDropOnCanvas}
-      >
-        {canvasElements.map((el) => (
-          <div
-            key={el.id}
-            className="absolute p-1 bg-white shadow-xl border border-gray-200 rounded-lg group"
-            style={{ left: el.x, top: el.y, width: el.width || 160 }}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => e.stopPropagation()}
-          >
-            {/* TOOLBAR (Visible on Hover) */}
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-1 bg-gray-800 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-xl z-20">
-              <button onClick={() => handleZoom(el.id, 40)} className="px-2 hover:bg-gray-600 rounded">+</button>
-              <button onClick={() => handleZoom(el.id, -40)} className="px-2 hover:bg-gray-600 rounded">-</button>
-              <button onClick={() => handleRemoveElement(el.id)} className="px-2 hover:bg-red-600 rounded text-red-400">×</button>
+        {/* CANVAS */}
+        <div
+          className="flex-1 h-full bg-white relative overflow-hidden cursor-crosshair"
+          style={{
+            backgroundImage:    activeRoom.bgImage ? `url(${activeRoom.bgImage})` : 'radial-gradient(#e2e8f0 1.5px, transparent 0)',
+            backgroundSize:     activeRoom.bgImage ? 'cover' : '24px 24px',
+            backgroundPosition: 'center',
+          }}
+          onDragOver={e => e.preventDefault()}
+          onDrop={handleDropOnCanvas}
+        >
+          {canvasElements.map((el, idx) => (
+            <div key={el.id || idx} className="absolute p-2 bg-white shadow-xl border border-gray-100 rounded-xl" style={{ left: el.x, top: el.y }}>
+              <img
+                src={el.url} alt="" className="w-40 rounded-lg pointer-events-none"
+                draggable onDragStart={(e) => e.dataTransfer.setData('itemData', JSON.stringify({ url: el.url, name: 'canvas-image' }))}
+              />
             </div>
-
-            <img
-              src={el.url}
-              alt=""
-              className="w-full h-auto rounded pointer-events-auto cursor-move"
-              draggable
-              onDragStart={(e) => {
-              e.stopPropagation();
-              e.dataTransfer.setData('itemData', JSON.stringify({
-                id: el.id,
-                url: el.url,
-                x: el.x,
-                y: el.y,
-                width: el.width || 160,
-                roomCode: el.room_code || activeRoom.roomCode,
-              }));
-            }}
-            />
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
         {/* SIDEBAR */}
         <aside className={`bg-white border-l border-gray-100 flex flex-col h-full transition-all duration-500 ease-in-out relative shadow-2xl z-30 ${isSidebarOpen ? 'w-[420px]' : 'w-20'}`}>
