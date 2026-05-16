@@ -168,8 +168,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('update_poll',   (room) => io.to(room).emit('poll_updated'));
-  socket.on('element_added', (data) => socket.to(data.roomCode).emit('element_received', data));
+socket.on('update_poll',    (room) => io.to(room).emit('poll_updated'));
+socket.on('element_added',  (data) => socket.to(data.roomCode).emit('element_received', data));
+socket.on('element_removed',(data) => socket.to(data.roomCode).emit('element_deleted', data));
+socket.on('element_moved',  (data) => socket.to(data.roomCode).emit('element_updated', data));
+socket.on('element_zoomed', (data) => socket.to(data.roomCode).emit('element_updated', data));
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -435,39 +438,42 @@ app.get('/api/canvas/:code', requireAuth, requireDB, async (req, res) => {
 
 // ADD New Canvas Element
 app.post('/api/canvas', requireAuth, requireDB, async (req, res) => {
-  const { roomCode, url, x, y, width } = req.body; // Added width
-  if (!roomCode || !url) return res.status(400).json({ message: 'roomCode and url are required.' });
-  
+  const { roomCode, url, x, y, width } = req.body;
   try {
-    // We capture the "result" to get the insertId
     const [result] = await db.query(
       'INSERT INTO canvas_elements (room_code, url, x, y, width) VALUES (?, ?, ?, ?, ?)',
       [roomCode, url, x || 0, y || 0, width || 160]
     );
-    
-    // Return the ID so the frontend can use it immediately for Delete/Zoom/Move
+    // CRITICAL: result.insertId is the actual number from the database (e.g., 31)
     res.json({ success: true, id: result.insertId }); 
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
-// UPDATE element (Position or Zoom)
-app.put('/api/canvas/:id', requireAuth, requireDB, async (req, res) => {
-    const { x, y, width } = req.body;
-    try {
-        await db.execute(
-            'UPDATE canvas_elements SET x = ?, y = ?, width = ? WHERE id = ?',
-            [x, y, width, req.params.id]
-        );
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ message: err.message }); }
-});
-
-// DELETE element
+// DELETE Canvas Element
 app.delete('/api/canvas/:id', requireAuth, requireDB, async (req, res) => {
-    try {
-        await db.execute('DELETE FROM canvas_elements WHERE id = ?', [req.params.id]);
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ message: err.message }); }
+  try {
+    await db.execute('DELETE FROM canvas_elements WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// UPDATE Canvas Element (Move/Zoom)
+app.put('/api/canvas/:id', requireAuth, requireDB, async (req, res) => {
+  const { x, y, width } = req.body;
+  const { id } = req.params;
+  try {
+    await db.execute(
+      'UPDATE canvas_elements SET x = ?, y = ?, width = ? WHERE id = ?',
+      [x, y, width, id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
