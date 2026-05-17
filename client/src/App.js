@@ -7,7 +7,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/login';
 import Signup from './components/signup';
 
-const API = 'https://adorable-peace-production-50ae.up.railway.app';
+const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 let socket = null;
 function getSocket() {
@@ -25,7 +25,11 @@ if (savedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${saved
 axios.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    // 1. Check if the error is from the Login or Signup API
+    const isAuthPath = err.config?.url?.includes('/api/login') || err.config?.url?.includes('/api/signup');
+
+    // 2. ONLY reload if it's a 401 AND NOT an auth attempt
+    if (err.response?.status === 401 && !isAuthPath) {
       localStorage.removeItem('token');
       localStorage.removeItem('userName');
       localStorage.removeItem('userColor');
@@ -33,6 +37,8 @@ axios.interceptors.response.use(
       if (socket) { socket.disconnect(); socket = null; }
       window.location.reload();
     }
+    
+    // Always return the error so the .catch() in Login.js can catch it!
     return Promise.reject(err);
   }
 );
@@ -190,7 +196,7 @@ function ErrorNotification({ message, onClose }) {
   }, [message, onClose]);
   if (!message) return null;
   return (
-    <div className="fixed top-4 right-4 z-[100] bg-red-50 border border-red-200 rounded-2xl px-6 py-4 shadow-lg flex items-start gap-3 max-w-sm">
+    <div className="fixed top-4 right-4 z-[200] bg-red-50 border border-red-200 rounded-2xl px-6 py-4 shadow-lg flex items-start gap-3 max-w-sm">
       <Icon.AlertCircle />
       <div className="flex-1"><p className="text-sm font-bold text-red-800">{message}</p></div>
       <button onClick={onClose} className="text-red-400 hover:text-red-600 transition shrink-0"><Icon.X /></button>
@@ -287,7 +293,7 @@ function RenameModal({ initialTitle, onConfirm, onCancel }) {
 function ReplyBanner({ replyTo, onClear }) {
   if (!replyTo) return null;
   return (
-    <div className="mx-2 mb-2 px-4 py-3 bg-brand-50 border-l-4 border-brand-500 rounded-xl flex items-start justify-between gap-3">
+    <div className="mx-2 mb-2 px-4 py-3 bg-brand-50 rounded-xl flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-[9px] font-black text-brand-500 uppercase tracking-widest mb-0.5">Replying to {replyTo.user}</p>
         <p className="text-[11px] text-gray-500 truncate">
@@ -347,12 +353,22 @@ function App() {
   const socketRef  = useRef(null);
   const chatEndRef  = useRef(null);
   const fileInputRef = useRef(null);
+  const textareaRef = useRef(null); // <--- Add this line
 
   const sock = () => {
     if (!socketRef.current || !socketRef.current.connected) socketRef.current = getSocket();
     return socketRef.current;
 
   };
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to shrink if text is deleted
+      textareaRef.current.style.height = "auto"; 
+      // Set new height based on content, maxing out at 150px
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + "px";
+    }
+  }, [message]);
 
   // ── Auth init ─────────────────────────────────────────────
   useEffect(() => {
@@ -776,41 +792,42 @@ function App() {
   if (activeRoom) return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans overflow-hidden">
       {previewImage && <ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />}
-      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} />
 
       {/* HEADER */}
-      <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-20 shadow-sm shrink-0">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => { 
-              setActiveRoom(null); 
-              setChatLog([]); 
-              setPolls([]); 
-              localStorage.removeItem('activeRoom'); // 👈 clear it
-              fetchRooms(); 
-            }}
-            className="w-10 h-10 flex items-center justify-center bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition"
-          >
-            <Icon.ArrowLeft />
-          </button>
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Workspace</p>
-            <h2 className="text-lg font-extrabold text-gray-800">{activeRoom.title}</h2>
-          </div>
-        </div>
-        {/* ✅ FIX: room code visible in header for all users */}
-        <div className="flex items-center gap-4">
-          <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 hidden md:flex items-center gap-2">
-            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Room Code</span>
-            <span className="text-sm font-black text-indigo-600 tracking-widest">{activeRoom.roomCode}</span>
-          </div>
-          <div className="h-8 w-px bg-gray-200" />
-          <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-full border border-gray-100">
-            <span className="text-sm font-bold text-gray-700">{displayName || 'You'}</span>
-            <div className="w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
-          </div>
-        </div>
-      </header>
+      <header className="h-16 md:h-20 bg-white border-b border-gray-100 flex items-center justify-between px-4 md:px-8 z-20 shadow-sm shrink-0">
+  <div className="flex items-center gap-3 md:gap-6">
+    <button
+      onClick={() => { 
+        setActiveRoom(null); 
+        setChatLog([]); 
+        setPolls([]); 
+        localStorage.removeItem('activeRoom');
+        fetchRooms(); 
+      }}
+      className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition"
+    >
+      <Icon.ArrowLeft />
+    </button>
+    <div>
+      <p className="hidden md:block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Workspace</p>
+      <h2 className="text-sm md:text-lg font-extrabold text-gray-800 truncate max-w-[120px] md:max-w-none">
+        {activeRoom.title}
+      </h2>
+    </div>
+  </div>
+
+  <div className="flex items-center gap-2 md:gap-4">
+    <div className="bg-indigo-50 px-3 md:px-4 py-1.5 md:py-2 rounded-xl border border-indigo-100 flex items-center gap-2">
+      <span className="text-[8px] md:text-[9px] font-black text-indigo-400 uppercase tracking-widest hidden sm:inline">Room Code</span>
+      <span className="text-xs md:text-sm font-black text-indigo-600 tracking-widest">{activeRoom.roomCode}</span>
+    </div>
+    <div className="h-8 w-px bg-gray-200 hidden md:block" />
+    <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 md:py-2 rounded-full border border-gray-100">
+      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+      <span className="text-xs md:text-sm font-bold text-gray-700 hidden sm:inline">{displayName || 'You'}</span>
+    </div>
+  </div>
+</header>
 
       <div className="flex-1 flex overflow-hidden">
         {/* CANVAS */}
@@ -835,36 +852,70 @@ function App() {
         </div>
 
         {/* SIDEBAR */}
-        <aside className={`bg-white border-l border-gray-100 flex flex-col h-full transition-all duration-500 ease-in-out relative shadow-2xl z-30 ${isSidebarOpen ? 'w-[420px]' : 'w-20'}`}>
-          <button
-            onClick={() => setIsSidebarOpen(v => !v)}
-            className="absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-100 rounded-full shadow-md flex items-center justify-center text-gray-400 hover:text-brand-500 z-50 transition-all hover:scale-110"
-          >
-            <Icon.ChevronRight className={`w-4 h-4 transition-transform duration-500 ${isSidebarOpen ? 'rotate-180' : ''}`} />
-          </button>
+       {!isSidebarOpen && (
+  <button
+    onClick={() => setIsSidebarOpen(true)}
+    className="fixed right-0 top-1/2 -translate-y-1/2 w-12 h-16 bg-brand-500 text-white rounded-l-3xl shadow-2xl flex items-center justify-center z-20 animate-in slide-in-from-right duration-500 hover:w-14 transition-all"
+  >
+    {/* This shows a chat icon on the edge of the screen */}
+    <Icon.MessageSquare className="w-6 h-6 mr-1" />
+  </button>
+)}
+
+<aside className={`
+  bg-white border-l border-gray-100 flex flex-col h-full 
+  transition-all duration-500 ease-in-out z-40 shadow-2xl
+  ${isSidebarOpen 
+    ? 'fixed inset-y-0 right-0 w-[90%] sm:w-[420px] md:relative md:w-[420px]' 
+    : 'fixed inset-y-0 -right-full md:relative md:w-20 md:right-0'}
+`}>
+<button
+    onClick={() => setIsSidebarOpen(v => !v)}
+    className="hidden md:flex absolute -left-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white border border-gray-100 rounded-full shadow-md items-center justify-center text-gray-400 hover:text-brand-500 z-50 transition-all"
+  >
+    <Icon.ChevronRight className={`w-4 h-4 transition-transform duration-500 ${isSidebarOpen ? 'rotate-180' : ''}`} />
+  </button>
 
           {isSidebarOpen ? (
             <div className="flex flex-col h-full overflow-hidden">
-              {/* Tabs */}
-              <div className="flex border-b border-gray-100 px-4 shrink-0 bg-white">
-                {[
-                  { id: 'chat',    label: 'Chat',    TabIcon: Icon.MessageSquare },
-                  { id: 'polls',   label: 'Polls',   TabIcon: Icon.BarChart      },
-                  { id: 'summary', label: 'Summary', TabIcon: Icon.Sparkles      },
-                ].map(({ id, label, TabIcon }) => (
-                  <button
-                    key={id} onClick={() => setActiveTab(id)}
-                    className={`flex-1 py-5 flex flex-col items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === id ? 'text-brand-500' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    <TabIcon className="w-4 h-4" />
-                    {label}
-                    {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-t-full" />}
-                  </button>
-                ))}
-              </div>
+             {/* 1. MOBILE ONLY HEADER */}
+<div className="flex md:hidden items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+  <div className="flex items-center gap-2">
+    <div className="w-2 h-2 bg-brand-500 rounded-full animate-ping" />
+    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
+      {activeTab} Window
+    </span>
+  </div>
+  <button 
+    onClick={() => setIsSidebarOpen(false)}
+    className="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow-sm text-gray-400"
+  >
+    <Icon.X />
+  </button>
+</div>
+
+{/* 2. TABS (Existing code, but let's make it scrollable for mobile) */}
+<div className="flex border-b border-gray-100 px-2 md:px-4 shrink-0 bg-white overflow-x-auto no-scrollbar">
+  {[
+    { id: 'chat',    label: 'Chat',    TabIcon: Icon.MessageSquare },
+    { id: 'polls',   label: 'Polls',   TabIcon: Icon.BarChart      },
+    { id: 'summary', label: 'Summary', TabIcon: Icon.Sparkles      },
+  ].map(({ id, label, TabIcon }) => (
+    <button
+      key={id} onClick={() => setActiveTab(id)}
+      className={`flex-1 min-w-[80px] py-4 md:py-5 flex flex-col items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === id ? 'text-brand-500' : 'text-gray-400 hover:text-gray-600'}`}
+    >
+      <TabIcon className="w-4 h-4" />
+      <span className="hidden xs:block">{label}</span>
+      {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-500 rounded-t-full" />}
+    </button>
+  ))}
+</div>
 
               {/* Tab Content */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#FBFCFE]">
+              <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 bg-[#FBFCFE] custom-scrollbar">
+   {/* Your existing Chat / Polls / Summary logic stays here */}
+
 
                 {/* ── CHAT ── */}
                 {activeTab === 'chat' && (
@@ -892,7 +943,7 @@ function App() {
                           </div>
                         )}
                         <div className={`flex items-end gap-2 ${isMe(msg.user) ? 'flex-row-reverse' : 'flex-row'}`}>
-                          <div className="max-w-[85%]">
+                          <div className="max-w-[92%] md:max-w-[85%]">
                             {msg.type === 'text' && (
                               <div className={`px-5 py-3.5 rounded-2xl text-sm shadow-sm break-words leading-relaxed ${isMe(msg.user) ? 'bg-brand-500 text-white rounded-tr-sm' : 'bg-white border border-gray-100 text-gray-700 rounded-tl-sm'}`}>
                                 {msg.message}
@@ -1043,7 +1094,6 @@ function App() {
                   </div>
                 )}
 
-                {/* ── SUMMARY ── ✅ FIX: renders bullet points from Gemini properly */}
                 {activeTab === 'summary' && (
                   <div className="space-y-6">
                     <div className="bg-gradient-to-br from-brand-500 to-indigo-600 p-6 rounded-3xl text-white shadow-xl shadow-brand-500/20">
@@ -1059,7 +1109,7 @@ function App() {
                           <div className={isSummarizing ? 'animate-spin' : ''}><Icon.RefreshCw /></div>
                         </button>
                       </div>
-                      {/* ✅ FIX: render each bullet on its own line */}
+
                       {summaryData.aiSummary
                         ? summaryData.aiSummary.split('\n').filter(l => l.trim()).map((line, i) => (
                             <p key={i} className="text-sm font-medium leading-relaxed text-indigo-100 mb-1">{line}</p>
@@ -1129,30 +1179,38 @@ function App() {
               {activeTab === 'chat' && (
                 <div className="p-4 border-t border-gray-100 bg-white shrink-0">
                   <ReplyBanner replyTo={replyTo} onClear={() => setReplyTo(null)} />
-                  <div className="flex items-center gap-2 bg-[#F8F9FD] p-2 rounded-2xl border border-gray-100">
-                    <label className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-brand-500 cursor-pointer transition rounded-xl hover:bg-brand-50">
-                      <Icon.Paperclip />
-                      <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleUpload(e)} />
-                    </label>
-                    <input
-                      type="text"
-                      className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300"
-                      placeholder={replyTo ? `Reply to ${replyTo.user}...` : 'Message team...'}
-                      value={message}
-                      onChange={e => setMessage(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                    />
-                    <button
-                      onClick={toggleRecording}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'bg-white text-gray-400 shadow-sm hover:text-brand-500'}`}
-                      title="Hold to record voice"
-                    >
-                      <Icon.Mic />
-                    </button>
-                    <button onClick={sendMessage} className="w-10 h-10 bg-brand-500 text-white rounded-xl shadow-lg shadow-brand-500/30 flex items-center justify-center hover:bg-brand-600 transition">
-                      <Icon.Send />
-                    </button>
-                  </div>
+                  <div className="flex items-end gap-1.5 md:gap-2 bg-[#F8F9FD] p-1.5 md:p-2 rounded-2xl border border-gray-100">
+  <label className="w-9 h-9 md:w-10 md:h-10 flex items-center justify-center text-gray-400 hover:text-brand-500 cursor-pointer transition rounded-xl hover:bg-brand-50">
+    <Icon.Paperclip />
+    <input ref={fileInputRef} type="file" className="hidden" onChange={e => handleUpload(e)} />
+  </label>
+  
+  <textarea
+    ref={textareaRef}
+    rows={1}
+    className="flex-1 bg-transparent py-2 text-sm outline-none font-medium text-gray-600 placeholder:text-gray-300 resize-none overflow-y-auto leading-relaxed"
+    placeholder={isRecording ? "Recording..." : "Message..."}
+    value={message}
+    onChange={e => setMessage(e.target.value)}
+    onKeyDown={e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }}
+  />
+
+  <button
+    onClick={toggleRecording}
+    className={`w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-gray-400'}`}
+  >
+    {isRecording ? <Icon.X /> : <Icon.Mic />}
+  </button>
+
+  <button onClick={sendMessage} className="w-9 h-9 md:w-10 md:h-10 bg-brand-500 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-brand-600">
+    <Icon.Send />
+  </button>
+</div>
                 </div>
               )}
             </div>
@@ -1261,6 +1319,9 @@ function App() {
   // ── Dashboard view ────────────────────────────────────────
 return (
     <>
+
+      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} /> {/* <--- Add this here */}
+      
       <Dashboard
         rooms={rooms} displayName={displayName}
         setIsCreateModalOpen={setIsCreateModalOpen} setIsJoinModalOpen={setIsJoinModalOpen}

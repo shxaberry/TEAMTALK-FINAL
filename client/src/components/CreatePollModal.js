@@ -23,7 +23,7 @@ const CreatePollModal = ({ isOpen, onClose, question, setQuestion, options, setO
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-6">
       <div className="bg-white w-full max-w-lg rounded-4xl shadow-2xl overflow-hidden relative">
         {/* Header (Purple as seen in Image 2) */}
-        <div className="bg-brand-500 p-8 flex items-center justify-between text-white">
+        <div className="bg-brand-500 p-5 md:p-8 flex items-center justify-between text-white">
             <div className="flex items-center gap-4">
                 <span className="text-2xl"></span>
                 <h2 className="text-xl font-extrabold tracking-tight">Create New Poll</h2>
@@ -31,7 +31,7 @@ const CreatePollModal = ({ isOpen, onClose, question, setQuestion, options, setO
             <button onClick={onClose} className="text-white/80 hover:text-white text-2xl font-bold">×</button>
         </div>
 
-        <div className="p-10 space-y-8">
+        <div className="p-6 md:p-10 space-y-6 md:space-y-8">
             {/* Question Field */}
             <div>
                 <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3">Question <span className="text-red-500">*</span></label>

@@ -24,7 +24,7 @@ const CreateModal = ({
       <div className="bg-white w-full max-w-lg rounded-4xl shadow-2xl overflow-hidden relative">
         
         {/* Header */}
-        <div className="p-8 pb-4 flex items-center justify-between">
+        <div className="p-5 md:p-8 pb-2 md:pb-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-500 text-2xl">+</div>
                 <div>
@@ -38,7 +38,7 @@ const CreateModal = ({
         </div>
 
         {/* Step Indicator */}
-        <div className="px-8 mb-8 flex items-center gap-4">
+        <div className="px-5 md:px-8 mb-6 md:mb-8 flex items-center gap-2 md:gap-4 overflow-x-auto">
             <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 1 ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-400'}`}>1</div>
                 <span className={`text-[11px] font-bold ${step === 1 ? 'text-brand-500' : 'text-gray-400'}`}>Identity</span>
@@ -55,7 +55,7 @@ const CreateModal = ({
             </div>
         </div>
 
-        <div className="px-10 pb-10">
+       <div className="px-5 pb-5 md:px-10 md:pb-10">
             {/* STEP 1: IDENTITY (Updated with Project Name) */}
             {step === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">

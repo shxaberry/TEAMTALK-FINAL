@@ -8,7 +8,7 @@ const JoinModal = ({ isOpen, onClose, roomCode, setRoomCode, displayName, avatar
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-[100] p-6">
       <div className="bg-white w-full max-w-lg rounded-4xl shadow-2xl overflow-hidden">
-        <div className="p-8 flex items-center justify-between border-b border-gray-50">
+        <div className="p-5 md:p-8 flex items-center justify-between border-b border-gray-50">
             <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-brand-50 rounded-2xl flex items-center justify-center text-brand-500 text-2xl">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
@@ -21,7 +21,7 @@ const JoinModal = ({ isOpen, onClose, roomCode, setRoomCode, displayName, avatar
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">×</button>
         </div>
 
-        <div className="p-10 space-y-8">
+        <div className="p-6 md:p-10 space-y-6 md:y-8">
             <div>
                 <label className="text-[10px] font-extrabold uppercase text-gray-400 tracking-widest block mb-3"> Room Code</label>
                 <input 
