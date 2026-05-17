@@ -17,8 +17,18 @@ const SECRET_KEY = process.env.SECRET_KEY || 'fallback_local_secret';
 const BASE_URL   = process.env.BASE_URL   || 'https://adorable-peace-production-50ae.up.railway.app';
 const PORT       = process.env.PORT       || 5000;
 
+// ── App & Server Initialization ───────────────────────────────────────────────
+const app = express(); // 1. Create app first
+const server = http.createServer(app); // 2. Then create server with app
+
+const io = new Server(server, {
+  cors: {
+    origin: "https://your-frontend.vercel.app", // Replace with your actual Vercel URL
+    methods: ["GET", "POST"]
+  }
+});
+
 // ── App ───────────────────────────────────────────────────────────────────────
-const app = express();
 app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
