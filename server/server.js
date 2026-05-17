@@ -18,14 +18,14 @@ const BASE_URL   = process.env.BASE_URL   || 'https://adorable-peace-production-
 const PORT       = process.env.PORT       || 5000;
 
 // ── App & Server Initialization ───────────────────────────────────────────────
-const app = express(); // 1. Create app first
-const server = http.createServer(app); // 2. Then create server with app
+const app = express(); 
+const server = http.createServer(app); 
 
-const FRONTEND_URL = "https://your-frontend.vercel.app";
+const FRONTEND_URL = "teamtalk-final-1dlk.vercel.app";
 
 const io = new Server(server, {
   cors: {
-    origin: [FRONTEND_URL, "http://localhost:3000"], // Replace with your actual Vercel URL
+    origin: [FRONTEND_URL, "teamtalk-final-1dlk.vercel.app"], 
     methods: ["GET", "POST"]
   }
 });
