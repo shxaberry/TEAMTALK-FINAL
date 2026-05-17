@@ -21,15 +21,20 @@ const PORT       = process.env.PORT       || 5000;
 const app = express(); // 1. Create app first
 const server = http.createServer(app); // 2. Then create server with app
 
+const FRONTEND_URL = "https://your-frontend.vercel.app";
+
 const io = new Server(server, {
   cors: {
-    origin: "https://your-frontend.vercel.app", // Replace with your actual Vercel URL
+    origin: [FRONTEND_URL, "http://localhost:3000"], // Replace with your actual Vercel URL
     methods: ["GET", "POST"]
   }
 });
 
 // ── App ───────────────────────────────────────────────────────────────────────
-app.use(cors({ origin: '*' }));
+app.use(cors({ 
+  origin: [FRONTEND_URL, "http://localhost:3000"],
+  credentials: true 
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
