@@ -9,3 +9,7 @@ uploads/
 
 # Logs
 *.log
+
+# Production build
+dist/
+build/
