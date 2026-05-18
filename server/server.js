@@ -10,7 +10,7 @@ const multer    = require('multer');
 const fs        = require('fs');
 const bcrypt    = require('bcrypt');
 const jwt       = require('jsonwebtoken');
-const Groq = require('groq-sdk');
+const Groq      = require('groq-sdk');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SECRET_KEY = process.env.SECRET_KEY || 'fallback_local_secret';
@@ -18,22 +18,21 @@ const BASE_URL   = process.env.BASE_URL   || 'https://adorable-peace-production-
 const PORT       = process.env.PORT       || 5000;
 
 // ── App & Server Initialization ───────────────────────────────────────────────
-const app = express(); 
-const server = http.createServer(app); 
+const app    = express();
+const server = http.createServer(app);
 
 const FRONTEND_URL = "teamtalk-final-1dlk.vercel.app";
 
 const io = new Server(server, {
   cors: {
-    origin: [FRONTEND_URL, "teamtalk-final-1dlk.vercel.app"], 
+    origin: [FRONTEND_URL, "teamtalk-final-1dlk.vercel.app"],
     methods: ["GET", "POST"]
   }
 });
 
-// ── App ───────────────────────────────────────────────────────────────────────
-app.use(cors({ 
+app.use(cors({
   origin: [FRONTEND_URL, "http://localhost:3000"],
-  credentials: true 
+  credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -62,14 +61,14 @@ async function connectDB() {
   const port     = Number(process.env.MYSQLPORT || process.env.DB_PORT) || 3306;
 
   if (!host || !user || !database) {
-    console.error(' Missing DB env vars. Retrying in 10s...');
+    console.error('Missing DB env vars. Retrying in 10s...');
     setTimeout(connectDB, 10000);
     return;
   }
 
   const attempts = [
-    { label: 'no SSL',                      ssl: false },
-    { label: 'SSL rejectUnauthorized=false', ssl: { rejectUnauthorized: false } },
+    { label: 'no SSL',                       ssl: false },
+    { label: 'SSL rejectUnauthorized=false',  ssl: { rejectUnauthorized: false } },
   ];
 
   for (const attempt of attempts) {
@@ -86,20 +85,31 @@ async function connectDB() {
       });
       await pool.query('SELECT 1');
       db = pool;
-      console.log(` DB connected — ${host}:${port}/${database}`);
+      console.log(`DB connected — ${host}:${port}/${database}`);
 
-      // ── One-time schema safety patch ───────────────────────
-      // Makes email/color nullable so signup never crashes on missing columns
+      // ── Schema safety patches ──────────────────────────────
       await db.query(`
         ALTER TABLE users
           MODIFY COLUMN email VARCHAR(255) NULL DEFAULT NULL,
           MODIFY COLUMN color VARCHAR(20)  NULL DEFAULT '#6366f1'
-      `).catch(() => {}); // safe to ignore if columns already correct
+      `).catch(() => {});
+
+      // Create poll_votes table if it doesn't exist
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS poll_votes (
+          id         INT AUTO_INCREMENT PRIMARY KEY,
+          poll_id    INT          NOT NULL,
+          option_id  INT          NOT NULL,
+          username   VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_vote (poll_id, username)
+        )
+      `).catch(() => {});
 
       // Keep-alive ping every 30s
       setInterval(async () => {
         try { await db.query('SELECT 1'); }
-        catch (e) { console.warn(' Keep-alive failed, reconnecting...'); db = null; connectDB(); }
+        catch (e) { console.warn('Keep-alive failed, reconnecting...'); db = null; connectDB(); }
       }, 30000);
 
       return;
@@ -108,7 +118,7 @@ async function connectDB() {
     }
   }
 
-  console.error(' All DB attempts failed. Retrying in 5s...');
+  console.error('All DB attempts failed. Retrying in 5s...');
   db = null;
   setTimeout(connectDB, 5000);
 }
@@ -145,9 +155,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
-const server = http.createServer(app);
-const io     = new Server(server, { cors: { origin: '*' } });
-
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token || socket.handshake.query?.token;
   if (!token) return next();
@@ -195,7 +202,6 @@ io.on('connection', (socket) => {
 app.post('/api/signup', requireDB, async (req, res) => {
   const { firstName, lastName, username, email, password, color } = req.body;
 
-  // Accept either { username } or { firstName, lastName }
   const resolvedUsername = username?.trim()
     || [firstName?.trim(), lastName?.trim()].filter(Boolean).join(' ');
 
@@ -299,7 +305,6 @@ app.delete('/api/rooms/:id', requireAuth, requireDB, async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-//  FIX: visit now increments visit_count column
 app.patch('/api/rooms/:code/visit', requireDB, async (req, res) => {
   try {
     await db.query(
@@ -310,7 +315,6 @@ app.patch('/api/rooms/:code/visit', requireDB, async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-//  FIX: edit now increments edit_count column
 app.patch('/api/rooms/:code/edit', requireDB, async (req, res) => {
   try {
     await db.query(
@@ -321,7 +325,6 @@ app.patch('/api/rooms/:code/edit', requireDB, async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-//  FIX: cover image — stores URL and returns it so frontend can update state
 app.patch('/api/rooms/:id/cover', requireAuth, requireDB, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
   const coverUrl = `${BASE_URL}/uploads/${req.file.filename}`;
@@ -369,39 +372,47 @@ app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
 //  POLLS
 // ══════════════════════════════════════════════════════════════════════════════
 
+// GET /api/polls/:code — returns polls with options + current user's voted option
 app.get('/api/polls/:code', requireAuth, requireDB, async (req, res) => {
   try {
     const [polls] = await db.query(
       'SELECT * FROM polls WHERE room_code = ?', [req.params.code]
     );
+
     for (const p of polls) {
+      // Get options with vote counts
       const [opts] = await db.query(
         'SELECT id, option_text AS optionText, votes FROM poll_options WHERE poll_id = ?',
         [p.id]
       );
       p.options = opts;
-      // Safely normalize ends_at — MySQL2 may return Date object or string
+
+      // Get which option this user voted for (if any)
+      const [[userVote]] = await db.query(
+        'SELECT option_id FROM poll_votes WHERE poll_id = ? AND username = ?',
+        [p.id, req.user.username]
+      );
+      p.userVotedOptionId = userVote?.option_id || null;
+
+      // Normalize ends_at to ISO string
       if (p.ends_at) {
         try {
-          let ms;
-          if (p.ends_at instanceof Date) {
-            ms = p.ends_at.getTime();
-          } else {
-            const s = String(p.ends_at).trim();
-            // MySQL DATETIME string "2026-05-13 11:51:09" — no timezone, treat as local
-            ms = new Date(s.replace(' ', 'T')).getTime();
-          }
+          const ms = p.ends_at instanceof Date
+            ? p.ends_at.getTime()
+            : new Date(String(p.ends_at).trim().replace(' ', 'T')).getTime();
           p.ends_at = isNaN(ms) ? null : new Date(ms).toISOString();
-        } catch(e) {
-          p.ends_at = null;
-        }
+        } catch { p.ends_at = null; }
       }
     }
+
     res.json(polls);
-  } catch (err) { console.error('GET /api/polls error:', err); res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    console.error('GET /api/polls error:', err);
+    res.status(500).json({ message: err.message });
+  }
 });
 
-//  FIX: removed endsAt requirement — poll launches without duration too
+// POST /api/polls — create a new poll
 app.post('/api/polls', requireAuth, requireDB, async (req, res) => {
   const { roomCode, question, options, endsAt } = req.body;
   if (!roomCode || !question || !Array.isArray(options) || options.length < 2)
@@ -409,7 +420,7 @@ app.post('/api/polls', requireAuth, requireDB, async (req, res) => {
   try {
     const [result] = await db.query(
       'INSERT INTO polls (room_code, question, ends_at) VALUES (?, ?, ?)',
-      [roomCode, question, endsAt ? new Date(endsAt).toISOString().slice(0,19).replace('T',' ') : null]
+      [roomCode, question, endsAt ? new Date(endsAt).toISOString().slice(0, 19).replace('T', ' ') : null]
     );
     for (const opt of options) {
       await db.query(
@@ -424,14 +435,87 @@ app.post('/api/polls', requireAuth, requireDB, async (req, res) => {
   }
 });
 
+// POST /api/polls/vote — one vote per user per poll, supports vote switching
 app.post('/api/polls/vote', requireAuth, requireDB, async (req, res) => {
-  if (!req.body.optionId) return res.status(400).json({ message: 'optionId is required.' });
+  const { optionId } = req.body;
+  if (!optionId) return res.status(400).json({ message: 'optionId is required.' });
+
   try {
-    await db.query(
-      'UPDATE poll_options SET votes = votes + 1 WHERE id = ?', [req.body.optionId]
+    // Look up which poll this option belongs to
+    const [[option]] = await db.query(
+      'SELECT poll_id FROM poll_options WHERE id = ?', [optionId]
     );
+    if (!option) return res.status(404).json({ message: 'Option not found.' });
+
+    const pollId   = option.poll_id;
+    const username = req.user.username;
+
+    // Check if this poll has expired
+    const [[poll]] = await db.query(
+      'SELECT room_code, ends_at FROM polls WHERE id = ?', [pollId]
+    );
+    if (!poll) return res.status(404).json({ message: 'Poll not found.' });
+
+    if (poll.ends_at) {
+      let endMs;
+      if (poll.ends_at instanceof Date) {
+        // mysql2 may return a Date object — use it directly (already UTC)
+        endMs = poll.ends_at.getTime();
+      } else {
+        // MySQL DATETIME string "2026-05-18 14:30:00" has no timezone.
+        // We stored it via toISOString() so it IS UTC — force UTC parsing by appending Z.
+        const s = String(poll.ends_at).trim().replace(' ', 'T');
+        endMs = new Date(s.endsWith('Z') ? s : s + 'Z').getTime();
+      }
+      if (!isNaN(endMs) && endMs < Date.now()) {
+        return res.status(403).json({ message: 'This poll has ended.' });
+      }
+    }
+
+    // Check if user has already voted on this poll
+    const [[existing]] = await db.query(
+      'SELECT id, option_id FROM poll_votes WHERE poll_id = ? AND username = ?',
+      [pollId, username]
+    );
+
+    if (existing) {
+      if (existing.option_id === optionId) {
+        // Voted for the same option — no-op
+        return res.json({ success: true, unchanged: true });
+      }
+      // Switch vote: decrement old option, increment new option, update record
+      await db.query(
+        'UPDATE poll_options SET votes = GREATEST(votes - 1, 0) WHERE id = ?',
+        [existing.option_id]
+      );
+      await db.query(
+        'UPDATE poll_options SET votes = votes + 1 WHERE id = ?',
+        [optionId]
+      );
+      await db.query(
+        'UPDATE poll_votes SET option_id = ? WHERE poll_id = ? AND username = ?',
+        [optionId, pollId, username]
+      );
+    } else {
+      // First-time vote
+      await db.query(
+        'UPDATE poll_options SET votes = votes + 1 WHERE id = ?',
+        [optionId]
+      );
+      await db.query(
+        'INSERT INTO poll_votes (poll_id, option_id, username) VALUES (?, ?, ?)',
+        [pollId, optionId, username]
+      );
+    }
+
+    // Broadcast real-time update to everyone in the room
+    io.to(poll.room_code).emit('poll_updated');
+
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    console.error('vote error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -460,7 +544,7 @@ app.post('/api/canvas', requireAuth, requireDB, async (req, res) => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  SUMMARY (AI) —  FIX: full bullet-point summary including images/voice/polls
+//  SUMMARY (AI)
 // ══════════════════════════════════════════════════════════════════════════════
 
 app.get('/api/summary/:code', requireAuth, requireDB, async (req, res) => {
@@ -483,8 +567,6 @@ app.get('/api/summary/:code', requireAuth, requireDB, async (req, res) => {
 
     try {
       if (msgs.length > 0 || polls.length > 0) {
-
-        // Build a numbered activity log for Claude
         let activityLines = [];
         let counter = 1;
 
@@ -517,9 +599,9 @@ Cover: what topics were discussed, any media or files shared, and poll results i
 Be conversational and concise. Do NOT list every message one by one. Summarize the overall session.`;
 
         const result = await groq.chat.completions.create({
-          model: 'llama-3.1-8b-instant',
+          model:      'llama-3.1-8b-instant',
           max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }]
+          messages:   [{ role: 'user', content: prompt }]
         });
         aiSummary = result.choices[0]?.message?.content || 'Summary unavailable.';
       }
@@ -534,6 +616,6 @@ Be conversational and concise. Do NOT list every message one by one. Summarize t
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
-  console.log(`   BASE_URL: ${BASE_URL}`);
+  console.log(`Server running on port ${PORT}`);
+  console.log(`BASE_URL: ${BASE_URL}`);
 });

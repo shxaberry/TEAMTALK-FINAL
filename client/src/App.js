@@ -25,10 +25,7 @@ if (savedToken) axios.defaults.headers.common['Authorization'] = `Bearer ${saved
 axios.interceptors.response.use(
   (res) => res,
   (err) => {
-    // 1. Check if the error is from the Login or Signup API
     const isAuthPath = err.config?.url?.includes('/api/login') || err.config?.url?.includes('/api/signup');
-
-    // 2. ONLY reload if it's a 401 AND NOT an auth attempt
     if (err.response?.status === 401 && !isAuthPath) {
       localStorage.removeItem('token');
       localStorage.removeItem('userName');
@@ -37,8 +34,6 @@ axios.interceptors.response.use(
       if (socket) { socket.disconnect(); socket = null; }
       window.location.reload();
     }
-    
-    // Always return the error so the .catch() in Login.js can catch it!
     return Promise.reject(err);
   }
 );
@@ -129,6 +124,11 @@ const Icon = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
   ),
+  Check: () => (
+    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+    </svg>
+  ),
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -138,9 +138,7 @@ function normalizeEndsAt(raw) {
   if (!raw) return null;
   const s = String(raw).trim();
   if (!s) return null;
-  // If it has Z or +offset it's UTC — parse directly
   if (s.endsWith('Z') || s.includes('+')) return new Date(s).getTime();
-  // MySQL DATETIME string like "2026-05-13 11:51:09" — treat as LOCAL time
   return new Date(s.replace(' ', 'T')).getTime();
 }
 
@@ -152,7 +150,7 @@ function PollCountdown({ endsAt }) {
     const endMs = normalizeEndsAt(endsAt);
     if (!endMs || isNaN(endMs)) return;
 
-    let id;  // declare before tick so clearInterval(id) works
+    let id;
     const tick = () => {
       const diff = endMs - Date.now();
       if (diff <= 0) { setExpired(true); setTimeLeft('Ended'); clearInterval(id); return; }
@@ -228,17 +226,10 @@ function DeleteConfirmModal({ roomTitle, onConfirm, onCancel }) {
           </p>
         </div>
         <div className="flex gap-3 w-full mt-1">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition"
-          >
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition">
             Cancel
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={isDeleting}
-            className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 transition disabled:opacity-60"
-          >
+          <button onClick={handleConfirm} disabled={isDeleting} className="flex-1 py-3 rounded-xl bg-red-500 text-white text-sm font-black hover:bg-red-600 transition disabled:opacity-60">
             {isDeleting ? 'Deleting…' : 'Delete project'}
           </button>
         </div>
@@ -258,11 +249,9 @@ function RenameModal({ initialTitle, onConfirm, onCancel }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
           </svg>
         </div>
-        
         <h3 className="text-xl font-black text-gray-900 mb-2">Rename Project</h3>
         <p className="text-sm text-gray-500 mb-6">Give your workspace a clear and descriptive name.</p>
-
-        <input 
+        <input
           autoFocus
           className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all mb-8"
           value={title}
@@ -270,18 +259,11 @@ function RenameModal({ initialTitle, onConfirm, onCancel }) {
           onKeyDown={(e) => e.key === 'Enter' && onConfirm(title)}
           placeholder="Project name..."
         />
-
         <div className="flex gap-3 w-full">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={onCancel} className="flex-1 py-4 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors">
             Cancel
           </button>
-          <button
-            onClick={() => onConfirm(title)}
-            className="flex-1 py-4 rounded-2xl bg-brand-500 text-white text-sm font-black hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20"
-          >
+          <button onClick={() => onConfirm(title)} className="flex-1 py-4 rounded-2xl bg-brand-500 text-white text-sm font-black hover:bg-brand-600 transition-all shadow-lg shadow-brand-500/20">
             Save Changes
           </button>
         </div>
@@ -347,25 +329,22 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(true);
   const [errorMessage, setErrorMessage]     = useState('');
 
-  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title }
-  const [renameTarget, setRenameTarget] = useState(null); // { id, title }
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [renameTarget, setRenameTarget] = useState(null);
 
-  const socketRef  = useRef(null);
+  const socketRef   = useRef(null);
   const chatEndRef  = useRef(null);
   const fileInputRef = useRef(null);
-  const textareaRef = useRef(null); // <--- Add this line
+  const textareaRef  = useRef(null);
 
   const sock = () => {
     if (!socketRef.current || !socketRef.current.connected) socketRef.current = getSocket();
     return socketRef.current;
-
   };
 
   useEffect(() => {
     if (textareaRef.current) {
-      // Reset height to shrink if text is deleted
-      textareaRef.current.style.height = "auto"; 
-      // Set new height based on content, maxing out at 150px
+      textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 150) + "px";
     }
   }, [message]);
@@ -381,7 +360,6 @@ function App() {
         setAvatarColor(res.data.color   || localStorage.getItem('userColor') || '#6366f1');
         socketRef.current = getSocket();
 
-        // 👇 restore room if user was inside one before refresh
         const savedRoom = localStorage.getItem('activeRoom');
         if (savedRoom) {
           try {
@@ -459,18 +437,22 @@ function App() {
       setRooms(normalized);
     } catch (err) { if (err.response?.status !== 401) setErrorMessage('Failed to fetch rooms.'); }
   };
+
   const fetchPolls = async (code) => {
     try { const res = await axios.get(`${API}/api/polls/${code}`); setPolls(res.data || []); }
     catch (err) { console.error('fetchPolls:', err); }
   };
+
   const fetchSummary = async (code) => {
     try { const res = await axios.get(`${API}/api/summary/${code}`); setSummaryData(res.data); }
     catch (err) { console.error('fetchSummary:', err); }
   };
+
   const fetchChatHistory = async (code) => {
     try { const res = await axios.get(`${API}/api/messages/${code}`); setChatLog(res.data || []); }
     catch (err) { console.error('fetchChatHistory:', err); }
   };
+
   const fetchCanvas = async (code) => {
     try { const res = await axios.get(`${API}/api/canvas/${code}`); setCanvasElements(res.data || []); }
     catch (err) { console.error('fetchCanvas:', err); }
@@ -503,7 +485,7 @@ function App() {
     if (!code) return;
     const normalizedRoom = { ...room, roomCode: code };
     setActiveRoom(normalizedRoom);
-    localStorage.setItem('activeRoom', JSON.stringify(normalizedRoom)); // 👈 save it
+    localStorage.setItem('activeRoom', JSON.stringify(normalizedRoom));
     sock().emit('join_room', code);
     axios.patch(`${API}/api/rooms/${code}/visit`).catch(console.error);
     fetchCanvas(code); fetchChatHistory(code); fetchPolls(code); fetchSummary(code);
@@ -555,7 +537,6 @@ function App() {
       setRenameTarget(null);
       return;
     }
-
     try {
       await axios.put(`${API}/api/rooms/${renameTarget.id}`, { title: newTitle });
       fetchRooms();
@@ -566,7 +547,6 @@ function App() {
     }
   };
 
-  // ✅ FIX: cover image — refreshes rooms list AND updates card immediately
   const handleChangeCover = async (roomId) => {
     const input  = document.createElement('input');
     input.type   = 'file';
@@ -578,7 +558,6 @@ function App() {
       fd.append('file', file);
       try {
         const res = await axios.patch(`${API}/api/rooms/${roomId}/cover`, fd);
-        // Update the room in state immediately so card re-renders with new cover
         setRooms(prev => prev.map(r =>
           r.id === roomId ? { ...r, cover_image: res.data.coverUrl } : r
         ));
@@ -614,14 +593,11 @@ function App() {
       replyTo: replyTo ? { user: replyTo.user, message: replyTo.message, type: replyTo.type, fileName: replyTo.fileName } : null,
     };
     sock().emit('send_message', msgData);
-    // ✅ FIX: increment edit count on each message sent
     axios.patch(`${API}/api/rooms/${activeRoom.roomCode}/edit`).catch(console.error);
     setChatLog(prev => [...prev, msgData]);
     setMessage(''); setReplyTo(null);
   };
 
-  // ✅ FIX: media messages now persist — they are saved to DB via socket send_message
-  // The socket handler on the server INSERTs the message, so on reload they come back from fetchChatHistory
   const handleUpload = async (e, type = 'file') => {
     const file = e.target?.files ? e.target.files[0] : e;
     if (!file) return;
@@ -637,7 +613,7 @@ function App() {
         user:      displayName || 'User',
         type:      isImage ? 'image' : type,
         fileUrl:   res.data.fileUrl,
-        file_url:  res.data.fileUrl,   // ✅ also set snake_case for DB reload consistency
+        file_url:  res.data.fileUrl,
         fileName:  res.data.fileName,
         file_name: res.data.fileName,
         color:     avatarColor,
@@ -654,7 +630,6 @@ function App() {
   const chunksRef = useRef([]);
 
   const toggleRecording = async () => {
-    // If already recording — stop it
     if (isRecording) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.stop();
@@ -663,7 +638,6 @@ function App() {
       return;
     }
 
-    // Start recording
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setErrorMessage('Microphone not supported in this browser.');
       return;
@@ -698,7 +672,7 @@ function App() {
         setIsRecording(false);
       };
 
-      recorder.start(100); // collect data every 100ms
+      recorder.start(100);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
     } catch (err) {
@@ -713,18 +687,35 @@ function App() {
     }
   };
 
-
-
   // ── Polls ─────────────────────────────────────────────────
-  const handleVote = async (optionId) => {
+  const handleVote = async (pollId, optionId) => {
+    // Optimistic UI update
+    setPolls(prev => prev.map(p => {
+      if (p.id !== pollId) return p;
+      const prevVotedId = p.userVotedOptionId;
+      return {
+        ...p,
+        userVotedOptionId: optionId,
+        options: p.options.map(o => ({
+          ...o,
+          votes: o.id === optionId
+            ? o.votes + 1
+            : o.id === prevVotedId
+            ? Math.max(0, o.votes - 1)
+            : o.votes,
+        })),
+      };
+    }));
+
     try {
       await axios.post(`${API}/api/polls/vote`, { optionId });
-      sock().emit('update_poll', activeRoom.roomCode);
-      fetchPolls(activeRoom.roomCode);
-    } catch { setErrorMessage('Failed to vote. Please try again.'); }
+      // Server broadcasts poll_updated via socket — all clients will fetchPolls
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || 'Failed to vote. Please try again.');
+      fetchPolls(activeRoom.roomCode); // revert optimistic update on error
+    }
   };
 
-  //  FIX: poll launch — better error display so you know what went wrong
   const handleLaunchPoll = async () => {
     if (!pollQuestion.trim()) { setErrorMessage('Please enter a poll question.'); return; }
     const filledOptions = pollOptions.filter(o => o.trim());
@@ -769,8 +760,6 @@ function App() {
     return !isNaN(endMs) && endMs < Date.now();
   };
 
-  // ── Helper: get fileUrl from either camelCase or snake_case ─────────────────
-  // Messages from socket use fileUrl; messages loaded from DB use file_url
   const getFileUrl  = (msg) => msg.fileUrl  || msg.file_url  || '';
   const getFileName = (msg) => msg.fileName || msg.file_name || '';
 
@@ -792,17 +781,18 @@ function App() {
   if (activeRoom) return (
     <div className="h-screen flex flex-col bg-slate-50 font-sans overflow-hidden">
       {previewImage && <ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />}
+      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} />
 
       {/* HEADER */}
       <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 z-20 shadow-sm shrink-0">
         <div className="flex items-center gap-6">
           <button
-            onClick={() => { 
-              setActiveRoom(null); 
-              setChatLog([]); 
-              setPolls([]); 
-              localStorage.removeItem('activeRoom'); // 👈 clear it
-              fetchRooms(); 
+            onClick={() => {
+              setActiveRoom(null);
+              setChatLog([]);
+              setPolls([]);
+              localStorage.removeItem('activeRoom');
+              fetchRooms();
             }}
             className="w-10 h-10 flex items-center justify-center bg-brand-50 text-brand-500 rounded-xl hover:bg-brand-100 transition"
           >
@@ -813,7 +803,6 @@ function App() {
             <h2 className="text-lg font-extrabold text-gray-800">{activeRoom.title}</h2>
           </div>
         </div>
-        {/* ✅ FIX: room code visible in header for all users */}
         <div className="flex items-center gap-4">
           <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 hidden md:flex items-center gap-2">
             <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Room Code</span>
@@ -913,7 +902,6 @@ function App() {
                                 {msg.message}
                               </div>
                             )}
-                            {/* ✅ FIX: use getFileUrl() so images show after reload too */}
                             {msg.type === 'image' && getFileUrl(msg) && (
                               <div
                                 className="relative rounded-2xl overflow-hidden cursor-pointer shadow-sm border border-gray-100 max-w-[220px]"
@@ -927,7 +915,6 @@ function App() {
                                 </div>
                               </div>
                             )}
-                            {/* ✅ FIX: voice messages use getFileUrl() so they play after reload */}
                             {msg.type === 'voice' && (
                               <div className="bg-brand-500 px-5 py-4 rounded-2xl flex items-center gap-4 shadow-lg shadow-brand-500/20 min-w-[200px]">
                                 <button
@@ -936,7 +923,6 @@ function App() {
                                     if (!audioEl) return;
                                     if (playingId === i) { audioEl.pause(); setPlayingId(null); }
                                     else {
-                                      // Reload src to ensure fresh load before playing
                                       audioEl.load();
                                       audioEl.play().then(() => {
                                         setPlayingId(i);
@@ -1006,49 +992,96 @@ function App() {
                       </div>
                     )}
                     {polls.map((poll) => {
-                      const expired = isPollExpired(poll);
-                      const total   = poll.options?.reduce((s, o) => s + (o.votes || 0), 0) || 0;
+                      const expired   = isPollExpired(poll);
+                      const total     = poll.options?.reduce((s, o) => s + (o.votes || 0), 0) || 0;
+                      const hasVoted  = !!poll.userVotedOptionId;
+
                       return (
                         <div key={poll.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                          {/* Poll header */}
                           <div className="flex justify-between items-start mb-4 gap-3">
                             <h4 className="font-extrabold text-[14px] text-gray-800 leading-snug flex-1">{poll.question}</h4>
                             <div className="flex flex-col items-end gap-2 shrink-0">
-                              {expired
-                                ? <span className="bg-gray-100 text-gray-400 text-[9px] font-black px-3 py-1 rounded-full uppercase">Ended</span>
-                                : <span className="bg-green-100 text-green-600 text-[9px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />Live
-                                  </span>
-                              }
-                              {/* ✅ FIX: use ends_at (snake_case from DB) */}
+                              {expired ? (
+                                <span className="bg-gray-100 text-gray-400 text-[9px] font-black px-3 py-1 rounded-full uppercase">Ended</span>
+                              ) : (
+                                <span className="bg-green-100 text-green-600 text-[9px] font-black px-3 py-1 rounded-full uppercase flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse" />Live
+                                </span>
+                              )}
+                              {/* Voted badge */}
+                              {hasVoted && !expired && (
+                                <span className="text-[9px] font-black text-brand-500 bg-brand-50 px-3 py-1 rounded-full flex items-center gap-1">
+                                  <Icon.Check /> Voted
+                                </span>
+                              )}
                               <PollCountdown endsAt={poll.ends_at || poll.endsAt} />
                             </div>
                           </div>
+
+                          {/* Poll options */}
                           <div className="space-y-2.5">
                             {poll.options?.map(opt => {
-                              const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+                              const pct     = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+                              const isVoted = poll.userVotedOptionId === opt.id;
+
                               return (
                                 <button
                                   key={opt.id}
-                                  onClick={() => !expired && handleVote(opt.id)}
+                                  onClick={() => !expired && handleVote(poll.id, opt.id)}
                                   disabled={expired}
-                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden ${expired ? 'border-gray-100 cursor-not-allowed' : 'border-gray-100 hover:border-brand-400 hover:shadow-md hover:scale-[1.02] cursor-pointer'}`}
+                                  className={`w-full text-left px-4 py-3.5 rounded-xl text-[12px] font-bold border transition-all relative overflow-hidden
+                                    ${expired
+                                      ? 'border-gray-100 cursor-not-allowed'
+                                      : isVoted
+                                      ? 'border-brand-500 ring-2 ring-brand-200 cursor-pointer scale-[1.01]'
+                                      : 'border-gray-100 hover:border-brand-400 hover:shadow-md hover:scale-[1.02] cursor-pointer'
+                                    }`}
                                 >
+                                  {/* Progress fill */}
                                   <div
-                                    className={`absolute inset-0 transition-all duration-700 rounded-xl ${expired ? 'bg-gray-100' : 'bg-brand-50'}`}
-                                    style={{ width: `${pct}%`, opacity: 0.6 }}
+                                    className={`absolute inset-0 transition-all duration-700 rounded-xl ${
+                                      expired ? 'bg-gray-100' : isVoted ? 'bg-brand-100' : 'bg-brand-50'
+                                    }`}
+                                    style={{ width: `${pct}%`, opacity: 0.7 }}
                                   />
-                                  <div className="relative flex justify-between items-center">
-                                    <span className={expired ? 'text-gray-500' : 'text-gray-700'}>{opt.optionText}</span>
-                                    <span className={`font-black ${expired ? 'text-gray-400' : 'text-brand-600'}`}>{pct}%</span>
+                                  {/* Label + percentage */}
+                                  <div className="relative flex justify-between items-center gap-2">
+                                    <span className={`flex items-center gap-2 ${
+                                      expired ? 'text-gray-500' : isVoted ? 'text-brand-700' : 'text-gray-700'
+                                    }`}>
+                                      {isVoted && (
+                                        <span className="text-brand-500 shrink-0"><Icon.Check /></span>
+                                      )}
+                                      {opt.optionText}
+                                    </span>
+                                    <span className={`font-black shrink-0 ${
+                                      expired ? 'text-gray-400' : isVoted ? 'text-brand-600' : 'text-brand-600'
+                                    }`}>
+                                      {pct}%
+                                    </span>
                                   </div>
                                 </button>
                               );
                             })}
                           </div>
-                          <p className="text-[9px] text-gray-400 mt-3 text-right font-medium">{total} vote{total !== 1 ? 's' : ''}</p>
+
+                          {/* Vote count + hint */}
+                          <div className="flex items-center justify-between mt-3">
+                            <p className="text-[9px] text-gray-400 font-medium">
+                              {total} vote{total !== 1 ? 's' : ''}
+                            </p>
+                            {!expired && !hasVoted && (
+                              <p className="text-[9px] text-gray-300 font-medium">Tap an option to vote</p>
+                            )}
+                            {!expired && hasVoted && (
+                              <p className="text-[9px] text-brand-400 font-medium">Tap another option to change your vote</p>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
+
                     <button
                       onClick={() => setIsPollModalOpen(true)}
                       className="w-full py-6 border-2 border-dashed border-brand-100 text-brand-500 rounded-3xl text-[11px] font-black uppercase tracking-[0.15em] hover:bg-brand-50 transition-all flex items-center justify-center gap-2"
@@ -1058,6 +1091,7 @@ function App() {
                   </div>
                 )}
 
+                {/* ── SUMMARY ── */}
                 {activeTab === 'summary' && (
                   <div className="space-y-6">
                     <div className="bg-gradient-to-br from-brand-500 to-indigo-600 p-6 rounded-3xl text-white shadow-xl shadow-brand-500/20">
@@ -1073,7 +1107,6 @@ function App() {
                           <div className={isSummarizing ? 'animate-spin' : ''}><Icon.RefreshCw /></div>
                         </button>
                       </div>
-
                       {summaryData.aiSummary
                         ? summaryData.aiSummary.split('\n').filter(l => l.trim()).map((line, i) => (
                             <p key={i} className="text-sm font-medium leading-relaxed text-indigo-100 mb-1">{line}</p>
@@ -1082,7 +1115,6 @@ function App() {
                       }
                     </div>
 
-                    {/* Activity Timeline */}
                     <div>
                       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4">
                         Activity Timeline ({summaryData.messages?.length || 0} messages)
@@ -1279,11 +1311,9 @@ function App() {
   );
 
   // ── Dashboard view ────────────────────────────────────────
-return (
+  return (
     <>
-
-      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} /> {/* <--- Add this here */}
-      
+      <ErrorNotification message={errorMessage} onClose={() => setErrorMessage('')} />
       <Dashboard
         rooms={rooms} displayName={displayName}
         setIsCreateModalOpen={setIsCreateModalOpen} setIsJoinModalOpen={setIsJoinModalOpen}
@@ -1313,7 +1343,6 @@ return (
           onCancel={() => setDeleteTarget(null)}
         />
       )}
-
       {renameTarget && (
         <RenameModal
           initialTitle={renameTarget.title}
